@@ -40,11 +40,8 @@ OpenUsage lives in your menu bar and shows you how much of your AI coding subscr
 - [**Windsurf**](docs/providers/windsurf.md) / prompt credits, flex credits
 - [**Z.ai**](docs/providers/zai.md) / session, weekly, web searches
 
-### Maybe Soon
-
-- [Vercel AI Gateway](https://github.com/robinebers/openusage/issues/18)
-
 Community contributions welcome.
+
 Want a provider that's not listed? [Open an issue.](https://github.com/robinebers/openusage/issues/new)
 
 ## Open Source, Community Driven
@@ -54,6 +51,14 @@ OpenUsage is built by its users. Hundreds of people use it daily, and the projec
 I maintain the project as a guide and quality gatekeeper, but this is your app as much as mine. If something is missing or broken, the best way to get it fixed is to contribute by opening an issue, or submitting a PR.
 
 Plugins are currently bundled as we build our the API, but soon will be made flexible so you can build and load their own.
+
+<a href="https://www.star-history.com/?repos=robinebers%2Fopenusage&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=robinebers/openusage&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=robinebers/openusage&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=robinebers/openusage&type=date&legend=top-left" />
+ </picture>
+</a>
 
 ### How to Contribute
 

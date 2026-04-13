@@ -428,22 +428,29 @@
     if (raw === undefined || raw === null) return null
     const str = String(raw).trim()
     if (!str) return null
-    // Retry-After can be a delay-seconds or HTTP-date
+    // Retry-After can be a delay-seconds or HTTP-date (RFC 7231).
+    // 0 means "retry immediately" — return 0 as a valid value.
     const seconds = parseInt(str, 10)
-    if (Number.isFinite(seconds) && seconds > 0) return seconds
+    if (Number.isFinite(seconds) && seconds >= 0) return seconds
     const dateMs = Date.parse(str)
     if (Number.isFinite(dateMs)) {
       const delay = Math.ceil((dateMs - Date.now()) / 1000)
-      return delay > 0 ? delay : null
+      return delay > 0 ? delay : 0
     }
     return null
+  }
+
+  function fmtRateLimitMinutes(seconds) {
+    if (seconds <= 0) return "now"
+    const mins = Math.ceil(seconds / 60)
+    return mins + "m"
   }
 
   function fetchUsageWithRetryAfter(ctx, accessToken) {
     const resp = fetchUsage(ctx, accessToken)
     if (resp.status === 429) {
       const retryAfter = parseRetryAfterSeconds(resp.headers)
-      if (retryAfter) {
+      if (retryAfter !== null) {
         ctx.host.log.info("429 received, Retry-After: " + retryAfter + "s")
         resp._retryAfterSeconds = retryAfter
       }
@@ -696,9 +703,9 @@
 
       if (resp.status === 429) {
         rateLimited = true
-        retryAfterSeconds = resp._retryAfterSeconds || null
+        retryAfterSeconds = resp._retryAfterSeconds ?? null
         ctx.host.log.warn("usage rate limited (429), skipping live usage fetch")
-        if (retryAfterSeconds) {
+        if (retryAfterSeconds !== null) {
           ctx.host.log.info("Retry-After: " + retryAfterSeconds + "s")
         }
       } else if (resp.status < 200 || resp.status >= 300) {
@@ -829,12 +836,15 @@
     const promoClockLine = fetchPromoClockLine(ctx)
 
     if (rateLimited) {
-      const waitText = retryAfterSeconds
-        ? "Rate limited, retry in ~" + Math.round(retryAfterSeconds / 60) + "m"
+      const retryText = retryAfterSeconds !== null
+        ? fmtRateLimitMinutes(retryAfterSeconds)
+        : null
+      const waitText = retryText
+        ? "Rate limited, retry in ~" + retryText
         : "Rate limited, try again later"
       lines.unshift(ctx.line.badge({ label: "Status", text: waitText, color: "#f59e0b" }))
-      const noteText = retryAfterSeconds
-        ? "Live usage rate limited — retry in ~" + Math.round(retryAfterSeconds / 60) + "m"
+      const noteText = retryText
+        ? "Live usage rate limited — retry in ~" + retryText
         : "Live usage rate limited — data may be stale"
       lines.push(ctx.line.text({ label: "Note", value: noteText }))
     } else if (lines.length === 0) {

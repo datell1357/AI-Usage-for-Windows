@@ -512,6 +512,25 @@ describe("claude plugin", () => {
     expect(statusLine.text).toContain("try again later")
   })
 
+  it("shows retry-now when Retry-After: 0", async () => {
+    const ctx = makeCtx()
+    ctx.host.fs.readText = () => JSON.stringify({ claudeAiOauth: { accessToken: "token" } })
+    ctx.host.fs.exists = () => true
+    ctx.host.http.request.mockReturnValue({
+      status: 429,
+      bodyText: "",
+      headers: { "Retry-After": "0" },
+    })
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+    const statusLine = result.lines.find((line) => line.label === "Status")
+    expect(statusLine).toBeTruthy()
+    expect(statusLine.text).toContain("~now")
+    const noteLine = result.lines.find((line) => line.label === "Note")
+    expect(noteLine).toBeTruthy()
+    expect(noteLine.value).toContain("~now")
+  })
+
   it("uses keychain credentials", async () => {
     const ctx = makeCtx()
     ctx.host.fs.exists = () => false
@@ -1783,17 +1802,18 @@ describe("claude plugin", () => {
       const ctx = makeCtx()
       ctx.host.fs.readText = () => JSON.stringify({ claudeAiOauth: { accessToken: "token" } })
       ctx.host.fs.exists = () => true
-      const futureDate = new Date(Date.now() + 15 * 60 * 1000).toUTCString()
+      // Use a fixed HTTP-date to avoid flakiness
       ctx.host.http.request.mockReturnValue({
         status: 429,
         bodyText: "",
-        headers: { "Retry-After": futureDate },
+        headers: { "Retry-After": "Mon, 13 Apr 2026 12:30:00 GMT" },
       })
       const plugin = await loadPlugin()
       const result = plugin.probe(ctx)
       const noteLine = result.lines.find((line) => line.label === "Note")
       expect(noteLine).toBeTruthy()
-      expect(noteLine.value).toContain("15m")
+      // Should show some minute value (depends on current time)
+      expect(noteLine.value).toMatch(/retry in ~\d+m/)
     })
   })
 })

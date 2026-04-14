@@ -779,8 +779,10 @@ describe("App", () => {
     await userEvent.click(settingsButtons[0])
     const checkboxes = await screen.findAllByRole("checkbox")
     const pluginCheckbox = checkboxes[checkboxes.length - 1]
+    // Clear any saves that happened during app init (e.g. settings normalisation)
+    state.savePluginSettingsMock.mockClear()
     await userEvent.click(pluginCheckbox)
-    expect(state.savePluginSettingsMock).toHaveBeenCalled()
+    expect(state.savePluginSettingsMock).toHaveBeenCalledTimes(1)
     await userEvent.click(pluginCheckbox)
     expect(state.savePluginSettingsMock).toHaveBeenCalledTimes(2)
   })

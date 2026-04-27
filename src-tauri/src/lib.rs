@@ -601,6 +601,8 @@ pub fn run() {
             local_http_api::start_server();
 
             tray::create(app.handle())?;
+            #[cfg(target_os = "windows")]
+            panel_windows::show_panel(app.handle());
 
             app.handle()
                 .plugin(tauri_plugin_updater::Builder::new().build())?;

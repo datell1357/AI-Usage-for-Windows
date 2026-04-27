@@ -2,7 +2,10 @@
 mod app_nap;
 mod config;
 mod local_http_api;
+#[cfg(target_os = "macos")]
 mod panel;
+#[cfg(target_os = "windows")]
+mod panel_windows;
 mod plugin_engine;
 mod tray;
 #[cfg(target_os = "macos")]
@@ -128,7 +131,10 @@ fn handle_global_shortcut(
 ) {
     if event.state == ShortcutState::Pressed {
         log::debug!("Global shortcut triggered");
+        #[cfg(target_os = "macos")]
         panel::toggle_panel(app);
+        #[cfg(target_os = "windows")]
+        panel_windows::toggle_panel(app);
     }
 }
 
@@ -190,14 +196,29 @@ pub struct ProbeBatchComplete {
 
 #[tauri::command]
 fn init_panel(app_handle: tauri::AppHandle) {
+    #[cfg(target_os = "macos")]
     panel::init(&app_handle).expect("Failed to initialize panel");
+
+    #[cfg(target_os = "windows")]
+    panel_windows::init(&app_handle).expect("Failed to initialize panel");
 }
 
 #[tauri::command]
 fn hide_panel(app_handle: tauri::AppHandle) {
-    use tauri_nspanel::ManagerExt;
-    if let Ok(panel) = app_handle.get_webview_panel("main") {
-        panel.hide();
+    #[cfg(target_os = "macos")]
+    {
+        use tauri_nspanel::ManagerExt;
+        if let Ok(panel) = app_handle.get_webview_panel("main") {
+            panel.hide();
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use tauri::Manager;
+        if let Some(window) = app_handle.get_webview_window("main") {
+            let _ = window.hide();
+        }
     }
 }
 
@@ -470,11 +491,17 @@ pub fn run() {
     let runtime = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
     let _guard = runtime.enter();
 
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_aptabase::Builder::new("A-US-6435241436").build())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_store::Builder::default().build())
-        .plugin(tauri_nspanel::init())
+        .plugin(tauri_plugin_store::Builder::default().build());
+
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder.plugin(tauri_nspanel::init());
+    }
+
+    builder
         .plugin(
             tauri_plugin_log::Builder::new()
                 .targets([

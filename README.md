@@ -66,7 +66,7 @@ AI Usage는 Windows 시스템 트레이에서만 동작하며 작업표시줄에
 #### 설치
 
 ```powershell
-npm install
+npm.cmd install
 ```
 
 #### 테스트
@@ -174,7 +174,7 @@ Providers that can be detected and queried successfully appear automatically. Cu
 #### Install
 
 ```powershell
-npm install
+npm.cmd install
 ```
 
 #### Test

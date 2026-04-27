@@ -209,6 +209,41 @@ describe("claude plugin", () => {
     )
   })
 
+  it("reads credentials from Windows-style CLAUDE_CONFIG_DIR", async () => {
+    const ctx = makeCtx()
+    const configDir = String.raw`C:\Users\openusage\.claude`
+    const configCredFile = configDir + "/.credentials.json"
+    const credsJson = JSON.stringify({
+      claudeAiOauth: { accessToken: "windows-file-token", subscriptionType: "pro" },
+    })
+    ctx.host.env.get.mockImplementation((name) =>
+      name === "CLAUDE_CONFIG_DIR" ? configDir : null
+    )
+    ctx.host.fs.exists = vi.fn((path) => path === configCredFile)
+    ctx.host.fs.readText = vi.fn((path) => {
+      if (path !== configCredFile) {
+        throw new Error("unexpected readText path: " + path)
+      }
+      return credsJson
+    })
+    ctx.host.http.request.mockImplementation((opts) => {
+      expect(opts.headers.Authorization).toBe("Bearer windows-file-token")
+      return {
+        status: 200,
+        bodyText: JSON.stringify({
+          five_hour: { utilization: 10, resets_at: "2099-01-01T00:00:00.000Z" },
+        }),
+      }
+    })
+
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+
+    expect(result.lines.find((line) => line.label === "Session")).toBeTruthy()
+    expect(ctx.host.fs.readText).toHaveBeenCalledWith(configCredFile)
+    expect(ctx.host.keychain.readGenericPasswordForCurrentUser).not.toHaveBeenCalled()
+  })
+
   it("looks up Claude Code-staging-oauth-credentials in keychain", async () => {
     const ctx = makeCtx()
     ctx.host.fs.exists = () => false

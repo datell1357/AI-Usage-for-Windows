@@ -172,6 +172,16 @@ Manual verification should include:
 - Windows Credential Manager reads upstream-compatible service names first and writes back to the same source that was read.
 - Windows updater support is not part of the first milestone. Build installable artifacts first, then enable updater after signing and artifact naming are verified.
 
+## Implementation Status, 2026-04-27
+
+- Windows panel/tray compile boundary has been added with a `panel_windows` Tauri window implementation.
+- Default enabled and bundled providers are limited to Claude and Codex.
+- Windows Credential Manager is wired behind the existing `ctx.host.keychain` plugin API.
+- Windows env/path/ccusage lookup has been added for common `CODEX_HOME`, `CLAUDE_CONFIG_DIR`, npm, npx, and Bun paths.
+- Settings wording and shortcut labels now use tray/Ctrl terminology on Windows.
+- Windows release workflow support has been added to the GitHub Actions publish matrix.
+- Local validation is currently blocked in this workspace by missing Rust/Cargo, missing Bun, and missing Node dependencies.
+
 ## Implementation Order
 
 1. Make the backend compile on Windows by gating or replacing `tauri-nspanel`.

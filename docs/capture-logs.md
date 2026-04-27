@@ -4,12 +4,14 @@ Use this when OpenUsage is not working and you need to share debug info.
 
 - Audience: non-technical users
 - Time: ~2 minutes
-- Platform: macOS
+- Platform: macOS or Windows
 
 ## 1) Set log level to Debug
 
-1. In your macOS menu bar, find the OpenUsage icon.
-2. Right-click it (or hold `Control` and click).
+1. Find the OpenUsage icon.
+   - On Windows, look in the system tray.
+   - On macOS, look in the menu bar.
+2. Right-click it. On macOS you can also hold `Control` and click.
 3. Open `Debug Level`.
 4. Select `Debug`.
 
@@ -21,7 +23,21 @@ If OpenUsage does not open at all, skip this step and continue.
 2. Wait for the failure to happen.
 3. Stop after 1-2 attempts (enough data, less noise).
 
-## 3) Open the log folder in Finder
+## 3) Open the log folder
+
+### Windows
+
+1. Press `Windows` + `R`.
+2. Paste this path:
+
+```text
+%APPDATA%\com.sunstory.openusage\logs
+```
+
+3. Press `Enter`.
+4. If that folder does not exist, open OpenUsage Settings and use the log path shown by the app, or search `%APPDATA%` for `openusage.log`.
+
+### macOS
 
 1. Open Finder.
 2. Press `Shift` + `Command` + `G`.
@@ -49,6 +65,7 @@ What happened instead:
 When it happened (local time + timezone):
 Which provider was affected (Codex / Claude / Cursor / etc.):
 OpenUsage version:
+Operating system (Windows / macOS):
 ```
 
 ## Privacy note

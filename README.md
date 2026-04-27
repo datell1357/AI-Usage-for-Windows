@@ -37,9 +37,9 @@ AI Usage는 Windows 시스템 트레이에서만 동작하며 작업표시줄에
 | [Codex](docs/providers/codex.md) | 활성화 | Codex/ChatGPT OAuth 사용량, 주간/세션 제한, reviews, credits |
 | [Gemini](docs/providers/gemini.md) | 활성화 | Gemini CLI OAuth credentials 및 Cloud Code quota API |
 | [Antigravity](docs/providers/antigravity.md) | 활성화 | Windows SQLite 및 Cloud Code fallback 경로 |
-| [Cursor](docs/providers/cursor.md) | 비활성화 | Cursor Desktop SQLite 및 CLI credential fallback |
+| [Cursor](docs/providers/cursor.md) | 사용 가능 | Cursor Desktop SQLite 및 CLI credential fallback |
 
-감지와 조회가 가능한 provider는 자동으로 표시됩니다. Cursor는 번들에 포함되어 있지만 Windows 계정/토큰/API 안정성 검증이 더 필요해 기본 비활성화 상태입니다.
+감지와 조회가 가능한 provider는 자동으로 표시됩니다. Cursor 사용량은 로컬 Windows 기기에 Cursor credential이 있고 앱 설정에서 Cursor provider가 활성화된 경우 표시됩니다.
 
 ### 문서
 
@@ -148,9 +148,9 @@ The Windows release currently bundles these providers:
 | [Codex](docs/providers/codex.md) | Enabled | Codex/ChatGPT OAuth usage, weekly/session limits, reviews, credits |
 | [Gemini](docs/providers/gemini.md) | Enabled | Gemini CLI OAuth credentials and Cloud Code quota APIs |
 | [Antigravity](docs/providers/antigravity.md) | Enabled | Windows SQLite and Cloud Code fallback path |
-| [Cursor](docs/providers/cursor.md) | Disabled | Cursor Desktop SQLite and CLI credential fallback |
+| [Cursor](docs/providers/cursor.md) | Available | Cursor Desktop SQLite and CLI credential fallback |
 
-Providers that can be detected and queried successfully appear automatically. Cursor is bundled but left off by default until Windows account, token, and API behavior is stable enough for automatic enablement.
+Providers that can be detected and queried successfully appear automatically. Cursor usage appears when Cursor credentials are available on the local Windows device and the Cursor provider is enabled in the app.
 
 ### Documentation
 

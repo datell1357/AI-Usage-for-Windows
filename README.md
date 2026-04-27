@@ -31,15 +31,15 @@ AI Usage는 Windows 시스템 트레이에서만 동작하며 작업표시줄에
 
 현재 Windows 릴리즈에 포함된 provider입니다.
 
-| Provider | 기본 상태 | 설명 |
+| Provider | 상태 | 설명 |
 |---|---:|---|
-| [Claude](docs/providers/claude.md) | 활성화 | Claude Code OAuth 사용량, 주간/세션 제한, extra usage, ccusage 로컬 토큰 데이터 |
-| [Codex](docs/providers/codex.md) | 활성화 | Codex/ChatGPT OAuth 사용량, 주간/세션 제한, reviews, credits |
-| [Gemini](docs/providers/gemini.md) | 활성화 | Gemini CLI OAuth credentials 및 Cloud Code quota API |
-| [Antigravity](docs/providers/antigravity.md) | 활성화 | Windows SQLite 및 Cloud Code fallback 경로 |
+| [Claude](docs/providers/claude.md) | 사용 가능 | Claude Code OAuth 사용량, 주간/세션 제한, extra usage, ccusage 로컬 토큰 데이터 |
+| [Codex](docs/providers/codex.md) | 사용 가능 | Codex/ChatGPT OAuth 사용량, 주간/세션 제한, reviews, credits |
+| [Gemini](docs/providers/gemini.md) | 사용 가능 | Gemini CLI OAuth credentials 및 Cloud Code quota API |
+| [Antigravity](docs/providers/antigravity.md) | 사용 가능 | Windows SQLite 및 Cloud Code fallback 경로 |
 | [Cursor](docs/providers/cursor.md) | 사용 가능 | Cursor Desktop SQLite 및 CLI credential fallback |
 
-감지와 조회가 가능한 provider는 자동으로 표시됩니다. Cursor 사용량은 로컬 Windows 기기에 Cursor credential이 있고 앱 설정에서 Cursor provider가 활성화된 경우 표시됩니다.
+각 provider 사용량은 해당 도구가 로컬 Windows 기기에 설치되어 있고, 로그인을 마쳐 credential을 사용할 수 있으며, 앱 설정에서 provider가 활성화된 경우 표시됩니다.
 
 ### 문서
 
@@ -142,15 +142,15 @@ The app runs from the Windows system tray, stays out of the taskbar, and opens a
 
 The Windows release currently bundles these providers:
 
-| Provider | Default | Notes |
+| Provider | Status | Notes |
 |---|---:|---|
-| [Claude](docs/providers/claude.md) | Enabled | Claude Code OAuth usage, weekly/session limits, extra usage, ccusage local token data |
-| [Codex](docs/providers/codex.md) | Enabled | Codex/ChatGPT OAuth usage, weekly/session limits, reviews, credits |
-| [Gemini](docs/providers/gemini.md) | Enabled | Gemini CLI OAuth credentials and Cloud Code quota APIs |
-| [Antigravity](docs/providers/antigravity.md) | Enabled | Windows SQLite and Cloud Code fallback path |
+| [Claude](docs/providers/claude.md) | Available | Claude Code OAuth usage, weekly/session limits, extra usage, ccusage local token data |
+| [Codex](docs/providers/codex.md) | Available | Codex/ChatGPT OAuth usage, weekly/session limits, reviews, credits |
+| [Gemini](docs/providers/gemini.md) | Available | Gemini CLI OAuth credentials and Cloud Code quota APIs |
+| [Antigravity](docs/providers/antigravity.md) | Available | Windows SQLite and Cloud Code fallback path |
 | [Cursor](docs/providers/cursor.md) | Available | Cursor Desktop SQLite and CLI credential fallback |
 
-Providers that can be detected and queried successfully appear automatically. Cursor usage appears when Cursor credentials are available on the local Windows device and the Cursor provider is enabled in the app.
+Provider usage appears when the corresponding third-party tool is installed on the local Windows device, the user has completed sign-in so credentials are available, and the provider is enabled in the app settings.
 
 ### Documentation
 

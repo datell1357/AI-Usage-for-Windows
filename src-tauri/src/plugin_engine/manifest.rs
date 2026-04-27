@@ -2,7 +2,7 @@ use base64::{Engine, engine::general_purpose::STANDARD};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
-const SUPPORTED_PLUGIN_IDS: &[&str] = &["claude", "codex", "cursor", "gemini"];
+const SUPPORTED_PLUGIN_IDS: &[&str] = &["antigravity", "claude", "codex", "cursor", "gemini"];
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -303,6 +303,7 @@ mod tests {
 
     #[test]
     fn supported_plugin_ids_are_limited_to_windows_enabled_providers() {
+        assert!(is_supported_plugin_id("antigravity"));
         assert!(is_supported_plugin_id("claude"));
         assert!(is_supported_plugin_id("codex"));
         assert!(is_supported_plugin_id("cursor"));

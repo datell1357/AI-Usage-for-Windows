@@ -2,7 +2,7 @@ const { cpSync, readdirSync, rmSync } = require("fs")
 const { join } = require("path")
 
 const root = __dirname
-const include = ["claude", "codex", "cursor", "gemini"]
+const include = ["antigravity", "claude", "codex", "cursor", "gemini"]
 const srcDir = join(root, "plugins")
 const dstDir = join(root, "src-tauri", "resources", "bundled_plugins")
 

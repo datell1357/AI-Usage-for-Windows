@@ -558,8 +558,8 @@ describe("App", () => {
     expect(firstCall.bars.length).toBeGreaterThanOrEqual(2)
   })
 
-  it("donut style path passed to renderTrayBarsIcon and clears tray title", async () => {
-    state.loadMenubarIconStyleMock.mockResolvedValue("donut")
+  it("bars style clears tray title", async () => {
+    state.loadMenubarIconStyleMock.mockResolvedValue("bars")
     state.invokeMock.mockImplementation(async (cmd: string) => {
       if (cmd === "list_plugins") {
         return [
@@ -590,8 +590,7 @@ describe("App", () => {
     const firstCallArgs = state.renderTrayBarsIconMock.mock.calls[0]
     expect(firstCallArgs).toBeDefined()
     const firstCall = firstCallArgs![0]
-    expect(firstCall.style).toBe("donut")
-    expect(firstCall.providerIconUrl).toBe("icon-a")
+    expect(firstCall.style).toBe("bars")
     expect(firstCall.percentText).toBeUndefined()
 
     await waitFor(() => expect(state.traySetTitleMock).toHaveBeenCalledWith(""))
@@ -719,21 +718,15 @@ describe("App", () => {
     })
   })
 
-  it("settings UI persists donut menubar icon style change", async () => {
+  it("settings UI hides removed menubar icon style choices", async () => {
     render(<App />)
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
 
     expect(screen.getByText("Tray Icon")).toBeVisible()
-    const donutRadio = await screen.findByRole("radio", { name: "Donut" })
-    await userEvent.click(donutRadio)
-    expect(state.saveMenubarIconStyleMock).toHaveBeenCalledWith("donut")
-
-    await waitFor(() => {
-      const latestCall = state.renderTrayBarsIconMock.mock.calls.at(-1)?.[0]
-      expect(latestCall).toBeDefined()
-      expect(latestCall!.style).toBe("donut")
-    })
+    expect(await screen.findByRole("radio", { name: "Bars" })).toBeVisible()
+    expect(screen.queryByRole("radio", { name: "Plugin" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("radio", { name: "Donut" })).not.toBeInTheDocument()
   })
 
   it("logs when saving display mode fails", async () => {

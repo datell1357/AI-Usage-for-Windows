@@ -209,16 +209,11 @@ describe("SettingsPage", () => {
     expect(onMenubarIconStyleChange).toHaveBeenCalledWith("bars")
   })
 
-  it("clicking Donut triggers onMenubarIconStyleChange(\"donut\")", async () => {
-    const onMenubarIconStyleChange = vi.fn()
-    render(
-      <SettingsPage
-        {...defaultProps}
-        onMenubarIconStyleChange={onMenubarIconStyleChange}
-      />
-    )
-    await userEvent.click(screen.getByRole("radio", { name: "Donut" }))
-    expect(onMenubarIconStyleChange).toHaveBeenCalledWith("donut")
+  it("only renders Bars as the tray icon style option", () => {
+    render(<SettingsPage {...defaultProps} />)
+    expect(screen.getByRole("radio", { name: "Bars" })).toBeInTheDocument()
+    expect(screen.queryByRole("radio", { name: "Plugin" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("radio", { name: "Donut" })).not.toBeInTheDocument()
   })
 
   it("does not render removed bar icon controls", () => {

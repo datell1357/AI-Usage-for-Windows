@@ -38,7 +38,7 @@ export const DEFAULT_AUTO_UPDATE_INTERVAL: AutoUpdateIntervalMinutes = 15;
 export const DEFAULT_THEME_MODE: ThemeMode = "system";
 export const DEFAULT_DISPLAY_MODE: DisplayMode = "left";
 export const DEFAULT_RESET_TIMER_DISPLAY_MODE: ResetTimerDisplayMode = "relative";
-export const DEFAULT_MENUBAR_ICON_STYLE: MenubarIconStyle = "provider";
+export const DEFAULT_MENUBAR_ICON_STYLE: MenubarIconStyle = "bars";
 export const DEFAULT_GLOBAL_SHORTCUT: GlobalShortcut = null;
 export const DEFAULT_START_ON_LOGIN = false;
 
@@ -46,11 +46,9 @@ const AUTO_UPDATE_INTERVALS: AutoUpdateIntervalMinutes[] = [5, 15, 30, 60];
 const THEME_MODES: ThemeMode[] = ["system", "light", "dark"];
 const DISPLAY_MODES: DisplayMode[] = ["used", "left"];
 const RESET_TIMER_DISPLAY_MODES: ResetTimerDisplayMode[] = ["relative", "absolute"];
-const MENUBAR_ICON_STYLES: MenubarIconStyle[] = ["provider", "donut", "bars"];
+const MENUBAR_ICON_STYLES: MenubarIconStyle[] = ["bars"];
 
 export const MENUBAR_ICON_STYLE_OPTIONS: { value: MenubarIconStyle; label: string }[] = [
-  { value: "provider", label: "Plugin" },
-  { value: "donut", label: "Donut" },
   { value: "bars", label: "Bars" },
 ];
 
@@ -228,7 +226,10 @@ export async function loadMenubarIconStyle(): Promise<MenubarIconStyle> {
 }
 
 export async function saveMenubarIconStyle(style: MenubarIconStyle): Promise<void> {
-  await store.set(MENUBAR_ICON_STYLE_KEY, style);
+  await store.set(
+    MENUBAR_ICON_STYLE_KEY,
+    isMenubarIconStyle(style) ? style : DEFAULT_MENUBAR_ICON_STYLE
+  );
   await store.save();
 }
 
@@ -258,10 +259,8 @@ export async function migrateLegacyTraySettings(): Promise<void> {
   if (!hasLegacyTrayStyle && !hasLegacyShowPercentage) return;
 
   if (hasLegacyTrayStyle && currentMenubarStyle == null) {
-    if (legacyTrayStyle === "bars") {
+    if (legacyTrayStyle === "bars" || legacyTrayStyle === "circle") {
       await store.set(MENUBAR_ICON_STYLE_KEY, "bars");
-    } else if (legacyTrayStyle === "circle") {
-      await store.set(MENUBAR_ICON_STYLE_KEY, "donut");
     }
   }
 

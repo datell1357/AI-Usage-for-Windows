@@ -15,8 +15,8 @@ The plugin looks for a GitHub token in this order:
 Install and authenticate with the GitHub CLI:
 
 ```bash
-# Install gh CLI (macOS)
-brew install gh
+# Install gh CLI (Windows)
+winget install --id GitHub.cli
 
 # Authenticate
 gh auth login

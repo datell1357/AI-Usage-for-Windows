@@ -8,7 +8,7 @@ export const makeCtx = () => {
     nowIso: "2026-02-02T00:00:00.000Z",
     app: {
       version: "0.0.0",
-      platform: "darwin",
+      platform: "windows",
       appDataDir: "/tmp/openusage-test",
       pluginDataDir: "/tmp/openusage-test/plugin",
     },

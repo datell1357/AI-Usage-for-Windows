@@ -114,7 +114,7 @@
     const parsed = ctx.util.tryParseJson(text)
     if (parsed) return parsed
 
-    // Some macOS keychain items are returned by `security ... -w` as hex-encoded UTF-8 bytes.
+    // Some legacy credential items may be stored as hex-encoded UTF-8 bytes.
     // Example prefix: "7b0a" ( "{\\n" ).
     // Support both plain hex and "0x..." forms.
     let hex = String(text).trim()
@@ -308,8 +308,7 @@
   }
 
   function saveCredentials(ctx, source, fullData) {
-    // MUST use minified JSON - macOS `security -w` hex-encodes values with newlines,
-    // which Claude Code can't read back, causing it to invalidate the session.
+    // MUST use minified JSON so Claude Code can read the stored session back.
     const text = JSON.stringify(fullData)
     if (source === "file") {
       try {

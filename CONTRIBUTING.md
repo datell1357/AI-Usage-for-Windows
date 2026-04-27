@@ -1,82 +1,72 @@
 # Contributing to AI Usage
 
-AI Usage accepts contributions, but has a high quality bar. Read this entire document before opening a PR.
+AI Usage is a Windows tray application for viewing AI coding subscription usage. Contributions should keep the app small, predictable, and safe around local credentials.
 
-## Philosophy
+## Project Priorities
 
-AI Usage is highly opinionated. It focuses on clean design, fast performance, and a great user experience. The feature set is intentionally limited to core functionality: tracking AI coding subscription usage, nothing more. Contributions that try to expand that scope, add unnecessary complexity, or compromise the UX will be closed.
+- Keep the app tray-first and Windows-focused.
+- Prefer reliable usage tracking over broad provider coverage.
+- Do not log tokens, account IDs, raw credential files, or full provider responses.
+- Keep provider behavior easy to disable when an API is unstable.
+- Use the AI Usage name, icon, installer name, and release wording for this project.
 
-If you're unsure whether your idea fits, open an issue first.
+## Before Opening a PR
 
-## Ground Rules
+1. Fork the repository and create a focused branch.
+2. Make one logical change per PR.
+3. Run the smallest relevant tests first, then a production build when the change affects shipped behavior.
+4. Include validation evidence in the PR description.
+5. Include screenshots or screen recordings for visible UI changes.
 
-- No feature creep. If it's not about usage tracking, it doesn't belong here.
-- No AI-generated commit messages. Write your own.
-- Test your changes. If it touches UI, include before/after screenshots.
-- Keep it simple. Don't over-engineer.
-- One PR per concern. Don't bundle unrelated changes.
-- Match the existing design language. AI Usage has a specific look and feel.
+## Development Commands
 
-## License Agreement
+Install dependencies:
 
-By submitting a pull request, you agree that your contribution is licensed under the [MIT License](LICENSE) that covers this project.
+```powershell
+npm install
+```
 
-## How to Contribute
+Run tests:
 
-### Fork and PR workflow
+```powershell
+npm.cmd test
+```
 
-1. Fork the repo
-2. Create a branch (`feat/my-change`, `fix/some-bug`, etc.)
-3. Make your changes
-4. Run `npm.cmd run build` and relevant `npm.cmd test -- ...` checks to verify nothing is broken
-5. Open a PR against `main`
+Run focused provider tests:
 
-### Add a provider plugin
+```powershell
+npm.cmd test -- plugins/gemini/plugin.test.js plugins/antigravity/plugin.test.js
+```
 
-Each provider is a plugin. See the [Plugin API docs](docs/plugins/api.md) for the full spec.
+Build the frontend:
 
-1. Create a new folder under `plugins/` with your provider name
-2. Add `plugin.json` (metadata) and `plugin.js` (implementation)
-3. Add documentation in `docs/providers/`
-4. Test it locally with `npm.cmd run tauri -- dev`
-5. Open a PR with screenshots showing it working
+```powershell
+npm.cmd run build
+```
 
-You can also [open an issue](https://github.com/datell1357/AI-Usage-for-Windows/issues/new?template=new_provider.yml) to request a provider without building it yourself.
+Build Windows installers:
 
-### Fix a bug
+```powershell
+$env:Path="$env:USERPROFILE\.cargo\bin;C:\Program Files\LLVM\bin;$env:Path"
+$env:LIBCLANG_PATH="C:\Program Files\LLVM\bin"
+npm.cmd run tauri -- build
+```
 
-1. Reference the issue number in your PR
-2. Describe the root cause and fix
-3. Include before/after screenshots for UI bugs
-4. Add a regression test if applicable
+## Provider Contributions
 
-### Request a feature
+Provider plugins live under `plugins/` and must include:
 
-Don't open a PR for large features without discussing first. [Open an issue](https://github.com/datell1357/AI-Usage-for-Windows/issues/new?template=feature_request.yml) and make your case.
+- `plugin.json` metadata
+- `plugin.js` implementation
+- tests for auth discovery, parsing, error states, and redaction-sensitive behavior
+- provider documentation under `docs/providers/`
 
-## What Gets Accepted
+New provider code should avoid writes to credential stores unless refresh persistence is required and tested. If a provider depends on an undocumented API, document the risk and keep the provider disabled by default until real Windows accounts have been verified.
 
-- Bug fixes with clear descriptions
-- New provider plugins that follow the Plugin API
-- Documentation improvements
-- Performance improvements with benchmarks
-- Accessibility improvements
+## Documentation Contributions
 
-## What Gets Rejected
+Documentation should describe this repository and the Windows app directly. Do not copy people lists, product branding, release language, or support promises from other projects. Source attribution and license notices belong in `LICENSE` and `TRADEMARK.md`.
 
-- Features that expand the scope beyond usage tracking
-- Changes that compromise speed, simplicity, or the existing UX
-- PRs without testing evidence
-- Code with no clear purpose or explanation
-- Cosmetic-only changes without prior discussion
+## License
 
-## Code Standards
-
-- TypeScript for frontend (`src/`)
-- Rust for backend (`src-tauri/`)
-- Follow existing patterns in the codebase
-- No new dependencies without justification
-
-## Questions?
-
-Open a [bug report](https://github.com/datell1357/AI-Usage-for-Windows/issues/new?template=bug_report.yml) or [feature request](https://github.com/datell1357/AI-Usage-for-Windows/issues/new?template=feature_request.yml) using the issue templates.
+By submitting a contribution, you agree that your contribution is provided under the MIT license terms used by this repository.

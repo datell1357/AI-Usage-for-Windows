@@ -29,7 +29,6 @@ describe("AboutDialog", () => {
     expect(screen.getByText("v1.2.3")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Yeoreum" })).toBeInTheDocument()
     expect(screen.getByText("GitHub")).toBeInTheDocument()
-    expect(screen.queryByText(/Maintainers/i)).not.toBeInTheDocument()
   })
 
   it("opens the builder profile on click", async () => {

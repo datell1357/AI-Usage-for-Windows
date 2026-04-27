@@ -2917,7 +2917,8 @@ mod tests {
 
     #[test]
     fn redact_body_redacts_user_id_and_email() {
-        let body = r#"{"user_id": "user-iupzZ7KFykMLrnzpkHSq7wjo", "email": "rob@sunstory.com"}"#;
+        let body =
+            r#"{"user_id": "user-iupzZ7KFykMLrnzpkHSq7wjo", "email": "user@example.com"}"#;
         let redacted = redact_body(body);
         assert!(
             !redacted.contains("user-iupzZ7KFykMLrnzpkHSq7wjo"),
@@ -2925,7 +2926,7 @@ mod tests {
             redacted
         );
         assert!(
-            !redacted.contains("rob@sunstory.com"),
+            !redacted.contains("user@example.com"),
             "email should be redacted, got: {}",
             redacted
         );
@@ -2936,7 +2937,7 @@ mod tests {
             redacted
         );
         assert!(
-            redacted.contains("rob@....com"),
+            redacted.contains("user....com"),
             "email should show first4...last4, got: {}",
             redacted
         );
@@ -3091,19 +3092,19 @@ mod tests {
     #[test]
     fn redact_body_redacts_name_field() {
         let body =
-            r#"{"userStatus":{"name":"Robin Ebers","email":"rob@sunstory.com","planStatus":{}}}"#;
+            r#"{"userStatus":{"name":"Sample User","email":"user@example.com","planStatus":{}}}"#;
         let redacted = redact_body(body);
         assert!(
-            !redacted.contains("Robin Ebers"),
+            !redacted.contains("Sample User"),
             "name should be redacted, got: {}",
             redacted
         );
         assert!(
-            !redacted.contains("rob@sunstory.com"),
+            !redacted.contains("user@example.com"),
             "email should be redacted, got: {}",
             redacted
         );
-        // "Robin Ebers" is 11 chars (<=12) so becomes [REDACTED]
+        // "Sample User" is 11 chars (<=12) so becomes [REDACTED]
         assert!(
             redacted.contains("\"name\": \"[REDACTED]\""),
             "name should show [REDACTED], got: {}",

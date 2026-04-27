@@ -46,6 +46,18 @@ pub fn position_panel_at_tray_icon(
     position_window_near_tray(app_handle, Some(icon_position), Some(icon_size));
 }
 
+pub fn position_panel_near_tray(app_handle: &AppHandle) {
+    let tray_rect = app_handle
+        .tray_by_id("tray")
+        .and_then(|tray| tray.rect().ok().flatten());
+
+    if let Some(rect) = tray_rect {
+        position_window_near_tray(app_handle, Some(rect.position), Some(rect.size));
+    } else {
+        position_window_near_tray(app_handle, None, None);
+    }
+}
+
 fn position_window_near_tray(
     app_handle: &AppHandle,
     icon_position: Option<Position>,

@@ -223,6 +223,12 @@ fn hide_panel(app_handle: tauri::AppHandle) {
 }
 
 #[tauri::command]
+fn position_panel(app_handle: tauri::AppHandle) {
+    #[cfg(target_os = "windows")]
+    panel_windows::position_panel_near_tray(&app_handle);
+}
+
+#[tauri::command]
 fn open_devtools(#[allow(unused)] app_handle: tauri::AppHandle) {
     #[cfg(debug_assertions)]
     {
@@ -546,6 +552,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             init_panel,
             hide_panel,
+            position_panel,
             open_devtools,
             start_probe_batch,
             list_plugins,

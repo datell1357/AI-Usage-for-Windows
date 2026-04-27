@@ -10,6 +10,8 @@ import { useAppUpdate } from "@/hooks/use-app-update"
 import { useAppUiStore } from "@/stores/app-ui-store"
 
 const ARROW_OVERHEAD_PX = 37
+const isWindowsPlatform = () =>
+  typeof window !== "undefined" && /Win/i.test(window.navigator.platform || "")
 
 type AppShellProps = {
   onRefreshAll: () => void
@@ -65,14 +67,15 @@ export function AppShell({
 
   const appVersion = useAppVersion()
   const { updateStatus, triggerInstall, checkForUpdates } = useAppUpdate()
+  const isWindows = isWindowsPlatform()
 
   return (
     <div
       ref={containerRef}
       tabIndex={-1}
-      className="flex flex-col items-center p-6 pt-1.5 bg-transparent outline-none"
+      className={`flex flex-col items-center p-6 bg-transparent outline-none ${isWindows ? "pt-6 pb-1.5" : "pt-1.5"}`}
     >
-      <div className="tray-arrow" />
+      {!isWindows && <div className="tray-arrow tray-arrow-top" />}
       <div
         className="relative bg-card rounded-xl overflow-hidden select-none w-full border shadow-lg flex flex-col"
         style={maxPanelHeightPx ? { maxHeight: `${maxPanelHeightPx - ARROW_OVERHEAD_PX}px` } : undefined}
@@ -114,6 +117,7 @@ export function AppShell({
           </div>
         </div>
       </div>
+      {isWindows && <div className="tray-arrow tray-arrow-bottom" />}
     </div>
   )
 }

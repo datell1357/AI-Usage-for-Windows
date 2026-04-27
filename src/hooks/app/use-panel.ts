@@ -7,7 +7,7 @@ import type { DisplayPluginState } from "@/hooks/app/use-app-plugin-views"
 
 const PANEL_WIDTH = 400
 const MAX_HEIGHT_FALLBACK_PX = 600
-const MAX_HEIGHT_FRACTION_OF_MONITOR = 0.8
+const MAX_HEIGHT_FRACTION_OF_MONITOR = 0.92
 
 type UsePanelArgs = {
   activeView: ActiveView
@@ -161,20 +161,27 @@ export function usePanel({
 
       let maxHeightPhysical: number | null = null
       let maxHeightLogical: number | null = null
+      const screenAvailHeight = Number(window.screen?.availHeight) || 0
+      if (screenAvailHeight > 0) {
+        maxHeightLogical = Math.floor(screenAvailHeight * MAX_HEIGHT_FRACTION_OF_MONITOR)
+        maxHeightPhysical = Math.floor(maxHeightLogical * factor)
+      }
 
       try {
         const monitor = await currentMonitor()
         if (monitor) {
-          maxHeightPhysical = Math.floor(monitor.size.height * MAX_HEIGHT_FRACTION_OF_MONITOR)
-          maxHeightLogical = Math.floor(maxHeightPhysical / factor)
+          const monitorMaxHeightPhysical = Math.floor(monitor.size.height * MAX_HEIGHT_FRACTION_OF_MONITOR)
+          if (maxHeightPhysical === null || monitorMaxHeightPhysical < maxHeightPhysical) {
+            maxHeightPhysical = monitorMaxHeightPhysical
+            maxHeightLogical = Math.floor(maxHeightPhysical / factor)
+          }
         }
       } catch {
         // fall through to fallback
       }
 
       if (maxHeightLogical === null) {
-        const screenAvailHeight = Number(window.screen?.availHeight) || MAX_HEIGHT_FALLBACK_PX
-        maxHeightLogical = Math.floor(screenAvailHeight * MAX_HEIGHT_FRACTION_OF_MONITOR)
+        maxHeightLogical = Math.floor(MAX_HEIGHT_FALLBACK_PX * MAX_HEIGHT_FRACTION_OF_MONITOR)
         maxHeightPhysical = Math.floor(maxHeightLogical * factor)
       }
 
@@ -189,6 +196,7 @@ export function usePanel({
       try {
         const currentWindow = getCurrentWindow()
         await currentWindow.setSize(new PhysicalSize(width, height))
+        await invoke("position_panel")
       } catch (e) {
         console.error("Failed to resize window:", e)
       }

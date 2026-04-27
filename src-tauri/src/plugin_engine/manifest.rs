@@ -2,6 +2,8 @@ use base64::{Engine, engine::general_purpose::STANDARD};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
+const SUPPORTED_PLUGIN_IDS: &[&str] = &["claude", "codex"];
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ManifestLine {
@@ -61,12 +63,23 @@ pub fn load_plugins_from_dir(plugins_dir: &std::path::Path) -> Vec<LoadedPlugin>
             continue;
         }
         if let Ok(p) = load_single_plugin(&path) {
-            plugins.push(p);
+            if is_supported_plugin_id(&p.manifest.id) {
+                plugins.push(p);
+            } else {
+                log::debug!(
+                    "skipping unsupported bundled plugin {}",
+                    p.manifest.id
+                );
+            }
         }
     }
 
     plugins.sort_by(|a, b| a.manifest.id.cmp(&b.manifest.id));
     plugins
+}
+
+fn is_supported_plugin_id(id: &str) -> bool {
+    SUPPORTED_PLUGIN_IDS.contains(&id)
 }
 
 fn load_single_plugin(
@@ -289,5 +302,13 @@ mod tests {
         assert_eq!(sanitized.len(), 1);
         assert_eq!(sanitized[0].label, "Status");
         assert_eq!(sanitized[0].url, "https://status.example.com");
+    }
+
+    #[test]
+    fn supported_plugin_ids_are_limited_to_claude_and_codex() {
+        assert!(is_supported_plugin_id("claude"));
+        assert!(is_supported_plugin_id("codex"));
+        assert!(!is_supported_plugin_id("cursor"));
+        assert!(!is_supported_plugin_id("copilot"));
     }
 }

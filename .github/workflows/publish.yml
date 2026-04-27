@@ -39,12 +39,12 @@ jobs:
         with:
           workspaces: "./src-tauri -> target"
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
         with:
-          bun-version: "latest"
-      - run: bun install
+          node-version: 24
+      - run: npm install
       - name: Bundle plugins
-        run: bun run bundle:plugins
+        run: npm run bundle:plugins
       - name: Verify bundled plugins
         shell: bash
         run: |
@@ -123,7 +123,7 @@ jobs:
           releaseName: ${{ env.RELEASE_TAG }}
           releaseDraft: false
           prerelease: false
-          includeUpdaterJson: true
+          includeUpdaterJson: false
           args: ${{ matrix.args }}
 
       - name: Verify Windows installer artifacts
@@ -137,12 +137,14 @@ jobs:
             exit 1
           }
 
-      - name: Verify updater assets uploaded
+      - name: Verify release assets uploaded
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ASSETS=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | tr -d '\r')
 
-          printf '%s\n' "$ASSETS" | grep -Fxq 'latest.json' || { echo "Missing updater manifest: latest.json"; exit 1; }
-          printf '%s\n' "$ASSETS" | grep -Eq '\.sig$' || { echo "Missing updater signatures (.sig)"; exit 1; }
+          if [ -z "$ASSETS" ]; then
+            echo "No release assets were uploaded for $RELEASE_TAG"
+            exit 1
+          fi

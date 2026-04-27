@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "build:release": "./scripts/build-release.sh",
     "ccusage:bump": "node ./scripts/bump-ccusage-version.mjs",
-    "bundle:plugins": "bun copy-bundled.cjs",
+    "bundle:plugins": "node copy-bundled.cjs",
     "preview": "vite preview",
     "test": "vitest",
     "test:watch": "vitest --watch",

@@ -379,6 +379,11 @@ fn read_env_from_interactive_shell(program: &str, name: &str) -> Option<String> 
 }
 
 fn read_env_from_interactive_shells(name: &str) -> Option<String> {
+    #[cfg(target_os = "windows")]
+    {
+        return read_env_from_windows_environment(name);
+    }
+
     let mut programs: Vec<String> = Vec::new();
 
     if let Some(shell) = shell_from_env() {
@@ -403,6 +408,23 @@ fn read_env_from_interactive_shells(name: &str) -> Option<String> {
         }
     }
 
+    None
+}
+
+#[cfg(target_os = "windows")]
+fn read_env_from_windows_environment(name: &str) -> Option<String> {
+    for target in ["User", "Machine"] {
+        let script = format!(
+            "[Environment]::GetEnvironmentVariable('{}', '{}')",
+            name, target
+        );
+        if let Some(value) = read_env_value_via_command(
+            "powershell",
+            &["-NoProfile", "-NonInteractive", "-Command", script.as_str()],
+        ) {
+            return Some(value);
+        }
+    }
     None
 }
 
@@ -1768,7 +1790,16 @@ fn ccusage_runner_candidates(kind: CcusageRunnerKind) -> Vec<String> {
         CcusageRunnerKind::Bunx => {
             if let Some(home) = dirs::home_dir() {
                 candidates.push(home.join(".bun/bin/bunx").to_string_lossy().to_string());
+                #[cfg(target_os = "windows")]
+                candidates.push(
+                    home.join(".bun/bin/bunx.exe")
+                        .to_string_lossy()
+                        .to_string(),
+                );
             }
+            #[cfg(target_os = "windows")]
+            candidates.extend(["bunx.exe", "bunx"].into_iter().map(str::to_string));
+            #[cfg(not(target_os = "windows"))]
             candidates.extend(
                 ["/opt/homebrew/bin/bunx", "/usr/local/bin/bunx", "bunx"]
                     .into_iter()
@@ -1776,6 +1807,9 @@ fn ccusage_runner_candidates(kind: CcusageRunnerKind) -> Vec<String> {
             );
         }
         CcusageRunnerKind::PnpmDlx => {
+            #[cfg(target_os = "windows")]
+            candidates.extend(["pnpm.cmd", "pnpm.exe", "pnpm"].into_iter().map(str::to_string));
+            #[cfg(not(target_os = "windows"))]
             candidates.extend(
                 ["/opt/homebrew/bin/pnpm", "/usr/local/bin/pnpm", "pnpm"]
                     .into_iter()
@@ -1783,6 +1817,9 @@ fn ccusage_runner_candidates(kind: CcusageRunnerKind) -> Vec<String> {
             );
         }
         CcusageRunnerKind::YarnDlx => {
+            #[cfg(target_os = "windows")]
+            candidates.extend(["yarn.cmd", "yarn.exe", "yarn"].into_iter().map(str::to_string));
+            #[cfg(not(target_os = "windows"))]
             candidates.extend(
                 ["/opt/homebrew/bin/yarn", "/usr/local/bin/yarn", "yarn"]
                     .into_iter()
@@ -1790,6 +1827,9 @@ fn ccusage_runner_candidates(kind: CcusageRunnerKind) -> Vec<String> {
             );
         }
         CcusageRunnerKind::NpmExec => {
+            #[cfg(target_os = "windows")]
+            candidates.extend(["npm.cmd", "npm.exe", "npm"].into_iter().map(str::to_string));
+            #[cfg(not(target_os = "windows"))]
             candidates.extend(
                 ["/opt/homebrew/bin/npm", "/usr/local/bin/npm", "npm"]
                     .into_iter()
@@ -1797,6 +1837,9 @@ fn ccusage_runner_candidates(kind: CcusageRunnerKind) -> Vec<String> {
             );
         }
         CcusageRunnerKind::Npx => {
+            #[cfg(target_os = "windows")]
+            candidates.extend(["npx.cmd", "npx.exe", "npx"].into_iter().map(str::to_string));
+            #[cfg(not(target_os = "windows"))]
             candidates.extend(
                 ["/opt/homebrew/bin/npx", "/usr/local/bin/npx", "npx"]
                     .into_iter()
@@ -1820,10 +1863,25 @@ fn ccusage_path_entries_with(home: Option<&Path>, existing_path: Option<&OsStr>)
 
     if let Some(home) = home {
         entries.push(home.join(".bun/bin"));
+        #[cfg(target_os = "windows")]
+        {
+            entries.push(home.join("AppData").join("Roaming").join("npm"));
+            entries.push(
+                home.join("AppData")
+                    .join("Local")
+                    .join("Programs")
+                    .join("bun")
+                    .join("bin"),
+            );
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
         entries.push(home.join(".nvm/current/bin"));
         entries.push(home.join(".local/bin"));
+        }
     }
 
+    #[cfg(not(target_os = "windows"))]
     entries.extend(
         ["/opt/homebrew/bin", "/usr/local/bin"]
             .into_iter()
@@ -2486,12 +2544,46 @@ fn expand_path(path: &str) -> String {
             return home.to_string_lossy().to_string();
         }
     }
-    if path.starts_with("~/") {
+    if path.starts_with("~/") || path.starts_with("~\\") {
         if let Some(home) = dirs::home_dir() {
             return home.join(&path[2..]).to_string_lossy().to_string();
         }
     }
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(expanded) = expand_windows_env_path(path) {
+            return expanded;
+        }
+    }
     path.to_string()
+}
+
+#[cfg(target_os = "windows")]
+fn expand_windows_env_path(path: &str) -> Option<String> {
+    if let Some(rest) = path.strip_prefix("%") {
+        if let Some(end) = rest.find('%') {
+            let name = &rest[..end];
+            let suffix = &rest[end + 1..];
+            if !name.is_empty() {
+                if let Some(value) = resolve_env_value(name) {
+                    return Some(format!("{value}{suffix}"));
+                }
+            }
+        }
+    }
+
+    if let Some(rest) = path.strip_prefix("$env:") {
+        let separator = rest.find(['/', '\\']).unwrap_or(rest.len());
+        let name = &rest[..separator];
+        let suffix = &rest[separator..];
+        if !name.is_empty() {
+            if let Some(value) = resolve_env_value(name) {
+                return Some(format!("{value}{suffix}"));
+            }
+        }
+    }
+
+    None
 }
 
 #[cfg(test)]
@@ -2814,6 +2906,52 @@ mod tests {
         let expected = home.join(".claude-custom").to_string_lossy().to_string();
 
         assert_eq!(expand_path("~/.claude-custom"), expected);
+    }
+
+    #[test]
+    fn expand_path_expands_tilde_with_windows_separator() {
+        let home = dirs::home_dir().expect("home dir");
+        let expected = home.join(".codex").to_string_lossy().to_string();
+
+        assert_eq!(expand_path("~\\.codex"), expected);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn expand_windows_env_path_expands_percent_and_powershell_prefixes() {
+        struct RestoreEnvVar {
+            name: &'static str,
+            old: Option<String>,
+        }
+
+        impl Drop for RestoreEnvVar {
+            fn drop(&mut self) {
+                if let Some(value) = self.old.take() {
+                    // SAFETY: this test restores the previous value in `Drop`.
+                    unsafe { std::env::set_var(self.name, value) };
+                } else {
+                    // SAFETY: this test restores/removes the variable in `Drop`.
+                    unsafe { std::env::remove_var(self.name) };
+                }
+            }
+        }
+
+        let old = std::env::var("OPENUSAGE_TEST_HOME").ok();
+        let _restore = RestoreEnvVar {
+            name: "OPENUSAGE_TEST_HOME",
+            old,
+        };
+        // SAFETY: this test restores the previous value in `Drop`.
+        unsafe { std::env::set_var("OPENUSAGE_TEST_HOME", r"C:\OpenUsageTest") };
+
+        assert_eq!(
+            expand_path(r"%OPENUSAGE_TEST_HOME%\.codex"),
+            r"C:\OpenUsageTest\.codex"
+        );
+        assert_eq!(
+            expand_path(r"$env:OPENUSAGE_TEST_HOME\.claude"),
+            r"C:\OpenUsageTest\.claude"
+        );
     }
 
     #[test]
@@ -3356,30 +3494,62 @@ mod tests {
 
     #[test]
     fn ccusage_path_entries_with_home_and_existing_path_preserves_order() {
+        #[cfg(target_os = "windows")]
+        let home = std::path::PathBuf::from(r"C:\openusage-home");
+        #[cfg(not(target_os = "windows"))]
         let home = std::path::PathBuf::from("/tmp/openusage-home");
-        let existing = std::env::join_paths([
+        #[cfg(target_os = "windows")]
+        let existing_paths = [
+            std::path::PathBuf::from(r"C:\Windows\System32"),
+            std::path::PathBuf::from(r"C:\Windows"),
+        ];
+        #[cfg(not(target_os = "windows"))]
+        let existing_paths = [
             std::path::PathBuf::from("/usr/bin"),
             std::path::PathBuf::from("/bin"),
+        ];
+        let existing = std::env::join_paths([
+            existing_paths[0].clone(),
+            existing_paths[1].clone(),
         ])
         .expect("join existing path");
 
         let entries = ccusage_path_entries_with(Some(home.as_path()), Some(existing.as_os_str()));
-        assert_eq!(
-            entries,
-            vec![
-                home.join(".bun/bin"),
-                home.join(".nvm/current/bin"),
-                home.join(".local/bin"),
-                std::path::PathBuf::from("/opt/homebrew/bin"),
-                std::path::PathBuf::from("/usr/local/bin"),
-                std::path::PathBuf::from("/usr/bin"),
-                std::path::PathBuf::from("/bin"),
-            ]
-        );
+        #[cfg(target_os = "windows")]
+        let expected = vec![
+            home.join(".bun/bin"),
+            home.join("AppData").join("Roaming").join("npm"),
+            home.join("AppData")
+                .join("Local")
+                .join("Programs")
+                .join("bun")
+                .join("bin"),
+            existing_paths[0].clone(),
+            existing_paths[1].clone(),
+        ];
+        #[cfg(not(target_os = "windows"))]
+        let expected = vec![
+            home.join(".bun/bin"),
+            home.join(".nvm/current/bin"),
+            home.join(".local/bin"),
+            std::path::PathBuf::from("/opt/homebrew/bin"),
+            std::path::PathBuf::from("/usr/local/bin"),
+            existing_paths[0].clone(),
+            existing_paths[1].clone(),
+        ];
+
+        assert_eq!(entries, expected);
     }
 
     #[test]
     fn ccusage_path_entries_with_deduplicates_prefix_and_existing_entries() {
+        #[cfg(target_os = "windows")]
+        let existing = std::env::join_paths([
+            std::path::PathBuf::from(r"C:\custom\bin"),
+            std::path::PathBuf::from(r"C:\custom\bin"),
+        ])
+        .expect("join existing path");
+        #[cfg(not(target_os = "windows"))]
         let existing = std::env::join_paths([
             std::path::PathBuf::from("/usr/local/bin"),
             std::path::PathBuf::from("/custom/bin"),
@@ -3389,36 +3559,57 @@ mod tests {
         .expect("join existing path");
 
         let entries = ccusage_path_entries_with(None, Some(existing.as_os_str()));
-        assert_eq!(
-            entries,
-            vec![
-                std::path::PathBuf::from("/opt/homebrew/bin"),
-                std::path::PathBuf::from("/usr/local/bin"),
-                std::path::PathBuf::from("/custom/bin"),
-            ]
-        );
+        #[cfg(target_os = "windows")]
+        let expected = vec![std::path::PathBuf::from(r"C:\custom\bin")];
+        #[cfg(not(target_os = "windows"))]
+        let expected = vec![
+            std::path::PathBuf::from("/opt/homebrew/bin"),
+            std::path::PathBuf::from("/usr/local/bin"),
+            std::path::PathBuf::from("/custom/bin"),
+        ];
+
+        assert_eq!(entries, expected);
     }
 
     #[test]
     fn ccusage_enriched_path_with_uses_defaults_without_home_or_existing_path() {
+        #[cfg(target_os = "windows")]
+        {
+            assert!(ccusage_enriched_path_with(None, None).is_none());
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
         let enriched = ccusage_enriched_path_with(None, None).expect("enriched path");
         let entries: Vec<std::path::PathBuf> =
             std::env::split_paths(enriched.as_os_str()).collect();
-        assert_eq!(
-            entries,
-            vec![
-                std::path::PathBuf::from("/opt/homebrew/bin"),
-                std::path::PathBuf::from("/usr/local/bin"),
-            ]
-        );
+        let expected = vec![
+            std::path::PathBuf::from("/opt/homebrew/bin"),
+            std::path::PathBuf::from("/usr/local/bin"),
+        ];
+        assert_eq!(entries, expected);
+        }
     }
 
     #[test]
     fn ccusage_enriched_path_with_preserves_entries_after_join_and_split() {
+        #[cfg(target_os = "windows")]
+        let home = std::path::PathBuf::from(r"C:\openusage-home");
+        #[cfg(not(target_os = "windows"))]
         let home = std::path::PathBuf::from("/tmp/openusage-home");
-        let existing = std::env::join_paths([
+        #[cfg(target_os = "windows")]
+        let existing_paths = [
+            std::path::PathBuf::from(r"C:\Windows\System32"),
+            std::path::PathBuf::from(r"C:\Windows"),
+        ];
+        #[cfg(not(target_os = "windows"))]
+        let existing_paths = [
             std::path::PathBuf::from("/usr/bin"),
             std::path::PathBuf::from("/bin"),
+        ];
+        let existing = std::env::join_paths([
+            existing_paths[0].clone(),
+            existing_paths[1].clone(),
         ])
         .expect("join existing path");
 
@@ -3426,19 +3617,39 @@ mod tests {
             .expect("path");
         let entries: Vec<std::path::PathBuf> =
             std::env::split_paths(enriched.as_os_str()).collect();
+        #[cfg(target_os = "windows")]
+        let expected = vec![
+            home.join(".bun/bin"),
+            home.join("AppData").join("Roaming").join("npm"),
+            home.join("AppData")
+                .join("Local")
+                .join("Programs")
+                .join("bun")
+                .join("bin"),
+            existing_paths[0].clone(),
+            existing_paths[1].clone(),
+        ];
+        #[cfg(not(target_os = "windows"))]
+        let expected = vec![
+            home.join(".bun/bin"),
+            home.join(".nvm/current/bin"),
+            home.join(".local/bin"),
+            std::path::PathBuf::from("/opt/homebrew/bin"),
+            std::path::PathBuf::from("/usr/local/bin"),
+            existing_paths[0].clone(),
+            existing_paths[1].clone(),
+        ];
 
-        assert_eq!(
-            entries,
-            vec![
-                home.join(".bun/bin"),
-                home.join(".nvm/current/bin"),
-                home.join(".local/bin"),
-                std::path::PathBuf::from("/opt/homebrew/bin"),
-                std::path::PathBuf::from("/usr/local/bin"),
-                std::path::PathBuf::from("/usr/bin"),
-                std::path::PathBuf::from("/bin"),
-            ]
-        );
+        assert_eq!(entries, expected);
+    }
+
+    #[test]
+    fn ccusage_runner_candidates_include_platform_specific_names() {
+        let npm_candidates = ccusage_runner_candidates(CcusageRunnerKind::NpmExec);
+        #[cfg(target_os = "windows")]
+        assert!(npm_candidates.iter().any(|candidate| candidate == "npm.cmd"));
+        #[cfg(not(target_os = "windows"))]
+        assert!(npm_candidates.iter().any(|candidate| candidate == "/usr/local/bin/npm"));
     }
 
     #[test]

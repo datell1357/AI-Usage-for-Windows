@@ -10,6 +10,11 @@ use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Mutex, OnceLock};
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 const WHITELISTED_ENV_VARS: [&str; 16] = [
     "CODEX_HOME",
@@ -49,12 +54,22 @@ fn read_env_from_process(name: &str) -> Option<String> {
 }
 
 fn read_env_value_via_command(program: &str, args: &[&str]) -> Option<String> {
-    let output = Command::new(program).args(args).output().ok()?;
+    let mut command = Command::new(program);
+    command.args(args);
+    configure_hidden_command_window(&mut command);
+    let output = command.output().ok()?;
     if !output.status.success() {
         return None;
     }
     let stdout = String::from_utf8_lossy(&output.stdout);
     last_non_empty_trimmed_line(&stdout)
+}
+
+fn configure_hidden_command_window(command: &mut Command) {
+    #[cfg(target_os = "windows")]
+    {
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
 }
 
 fn current_macos_keychain_account_from_user_env(user_env: Option<String>) -> String {
@@ -1930,6 +1945,7 @@ fn ccusage_runner_available(candidate: &str, enriched_path: Option<&OsStr>) -> b
     command
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
+    configure_hidden_command_window(&mut command);
 
     command.status().map(|s| s.success()).unwrap_or(false)
 }
@@ -1946,6 +1962,7 @@ fn configure_ccusage_command(
     command
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
+    configure_hidden_command_window(command);
 }
 
 fn resolve_ccusage_runner_binary(kind: CcusageRunnerKind) -> Option<String> {
@@ -2450,12 +2467,12 @@ fn inject_sqlite<'js>(ctx: &Ctx<'js>, host: &Object<'js>) -> rquickjs::Result<()
 
                 // Prefer a normal read-only open so WAL contents are visible (common for app state DBs).
                 // Fall back to immutable=1 to bypass WAL/SHM lock issues after macOS sleep.
-                let primary = std::process::Command::new("sqlite3")
-                    .args(["-readonly", "-json", &expanded, &sql])
-                    .output()
-                    .map_err(|e| {
-                        Exception::throw_message(&ctx_inner, &format!("sqlite3 exec failed: {}", e))
-                    })?;
+                let mut primary_command = std::process::Command::new("sqlite3");
+                primary_command.args(["-readonly", "-json", &expanded, &sql]);
+                configure_hidden_command_window(&mut primary_command);
+                let primary = primary_command.output().map_err(|e| {
+                    Exception::throw_message(&ctx_inner, &format!("sqlite3 exec failed: {}", e))
+                })?;
 
                 if primary.status.success() {
                     return Ok(String::from_utf8_lossy(&primary.stdout).to_string());
@@ -2468,12 +2485,12 @@ fn inject_sqlite<'js>(ctx: &Ctx<'js>, host: &Object<'js>) -> rquickjs::Result<()
                     .replace('#', "%23")
                     .replace('?', "%3F");
                 let uri_path = format!("file:{}?immutable=1", encoded);
-                let fallback = std::process::Command::new("sqlite3")
-                    .args(["-readonly", "-json", &uri_path, &sql])
-                    .output()
-                    .map_err(|e| {
-                        Exception::throw_message(&ctx_inner, &format!("sqlite3 exec failed: {}", e))
-                    })?;
+                let mut fallback_command = std::process::Command::new("sqlite3");
+                fallback_command.args(["-readonly", "-json", &uri_path, &sql]);
+                configure_hidden_command_window(&mut fallback_command);
+                let fallback = fallback_command.output().map_err(|e| {
+                    Exception::throw_message(&ctx_inner, &format!("sqlite3 exec failed: {}", e))
+                })?;
 
                 if !fallback.status.success() {
                     let stderr_primary = String::from_utf8_lossy(&primary.stderr);
@@ -2505,12 +2522,12 @@ fn inject_sqlite<'js>(ctx: &Ctx<'js>, host: &Object<'js>) -> rquickjs::Result<()
                     ));
                 }
                 let expanded = expand_path(&db_path);
-                let output = std::process::Command::new("sqlite3")
-                    .args([&expanded, &sql])
-                    .output()
-                    .map_err(|e| {
-                        Exception::throw_message(&ctx_inner, &format!("sqlite3 exec failed: {}", e))
-                    })?;
+                let mut command = std::process::Command::new("sqlite3");
+                command.args([&expanded, &sql]);
+                configure_hidden_command_window(&mut command);
+                let output = command.output().map_err(|e| {
+                    Exception::throw_message(&ctx_inner, &format!("sqlite3 exec failed: {}", e))
+                })?;
 
                 if !output.status.success() {
                     let stderr = String::from_utf8_lossy(&output.stderr);

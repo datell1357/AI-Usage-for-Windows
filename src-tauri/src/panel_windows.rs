@@ -7,6 +7,7 @@ pub fn init(app_handle: &AppHandle) -> tauri::Result<()> {
     if let Some(window) = app_handle.get_webview_window(WINDOW_LABEL) {
         window.set_decorations(false)?;
         window.set_resizable(false)?;
+        window.set_skip_taskbar(true)?;
     }
     Ok(())
 }
@@ -18,6 +19,7 @@ pub fn show_panel(app_handle: &AppHandle) {
     };
 
     position_window_near_tray(app_handle, None, None);
+    let _ = window.set_skip_taskbar(true);
     let _ = window.show();
     let _ = window.set_focus();
 }
@@ -60,10 +62,27 @@ fn position_window_near_tray(
 
     if let (Some(position), Some(size)) = (icon_position, icon_size) {
         let (icon_x, icon_y) = physical_position(position);
-        let (icon_w, _) = physical_size(size);
-        let x = icon_x + (icon_w as i32 / 2) - (panel_size.width as i32 / 2);
-        let y = icon_y - panel_size.height as i32 - PANEL_MARGIN;
-        let _ = window.set_position(PhysicalPosition::new(x.max(0), y.max(0)));
+        let (icon_w, icon_h) = physical_size(size);
+        let mut x = icon_x + (icon_w as i32 / 2) - (panel_size.width as i32 / 2);
+        let mut y = icon_y - panel_size.height as i32 - PANEL_MARGIN;
+
+        if let Ok(Some(monitor)) = window.current_monitor().or_else(|_| window.primary_monitor()) {
+            let origin = monitor.position();
+            let size = monitor.size();
+            let right = origin.x + size.width as i32;
+            let bottom = origin.y + size.height as i32;
+            x = x.clamp(origin.x + PANEL_MARGIN, right - panel_size.width as i32 - PANEL_MARGIN);
+
+            if y < origin.y + PANEL_MARGIN {
+                y = icon_y + icon_h as i32 + PANEL_MARGIN;
+            }
+            y = y.clamp(origin.y + PANEL_MARGIN, bottom - panel_size.height as i32 - PANEL_MARGIN);
+        } else {
+            x = x.max(0);
+            y = y.max(0);
+        }
+
+        let _ = window.set_position(PhysicalPosition::new(x, y));
         return;
     }
 

@@ -93,14 +93,15 @@ describe("settings", () => {
 
   it("auto-disables new non-default plugins", () => {
     const plugins: PluginMeta[] = [
-      { id: "claude", name: "Claude", iconUrl: "", lines: [], primaryCandidates: [] },
-      { id: "codex", name: "Codex", iconUrl: "", lines: [], primaryCandidates: [] },
       { id: "cursor", name: "Cursor", iconUrl: "", lines: [], primaryCandidates: [] },
-      { id: "copilot", name: "Copilot", iconUrl: "", lines: [], primaryCandidates: [] },
+      { id: "antigravity", name: "Antigravity", iconUrl: "", lines: [], primaryCandidates: [] },
+      { id: "gemini", name: "Gemini", iconUrl: "", lines: [], primaryCandidates: [] },
+      { id: "codex", name: "Codex", iconUrl: "", lines: [], primaryCandidates: [] },
+      { id: "claude", name: "Claude", iconUrl: "", lines: [], primaryCandidates: [] },
     ]
     const result = normalizePluginSettings({ order: [], disabled: [] }, plugins)
-    expect(result.order).toEqual(["claude", "codex", "cursor", "copilot"])
-    expect(result.disabled).toEqual(["cursor", "copilot"])
+    expect(result.order).toEqual(["claude", "codex", "gemini", "antigravity", "cursor"])
+    expect(result.disabled).toEqual(["cursor"])
   })
 
   it("compares settings equality", () => {

@@ -76,7 +76,9 @@ export const RESET_TIMER_DISPLAY_OPTIONS: { value: ResetTimerDisplayMode; label:
 
 const store = new LazyStore(SETTINGS_STORE_PATH);
 
-const DEFAULT_ENABLED_PLUGINS = new Set(["claude", "codex"]);
+export const DEFAULT_PLUGIN_ORDER = ["claude", "codex", "gemini", "antigravity", "cursor"] as const;
+
+const DEFAULT_ENABLED_PLUGINS = new Set(["claude", "codex", "gemini", "antigravity"]);
 
 export const DEFAULT_PLUGIN_SETTINGS: PluginSettings = {
   order: [],
@@ -121,7 +123,17 @@ export function normalizePluginSettings(
   settings: PluginSettings,
   plugins: PluginMeta[]
 ): PluginSettings {
-  const knownIds = plugins.map((plugin) => plugin.id);
+  const defaultOrder = new Map<string, number>(
+    DEFAULT_PLUGIN_ORDER.map((id, index) => [id, index])
+  );
+  const knownIds = plugins
+    .map((plugin) => plugin.id)
+    .sort((a, b) => {
+      const aOrder = defaultOrder.get(a) ?? Number.MAX_SAFE_INTEGER;
+      const bOrder = defaultOrder.get(b) ?? Number.MAX_SAFE_INTEGER;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return a.localeCompare(b);
+    });
   const knownSet = new Set(knownIds);
 
   const order: string[] = [];

@@ -87,7 +87,7 @@ describe("SideNav", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Help" }))
 
-    expect(openUrl).toHaveBeenCalledWith("https://github.com/datell1357/AI-Usage-for-Windows/")
+    expect(openUrl).toHaveBeenCalledWith("https://github.com/datell1357/AI-Usage-for-Windows")
     expect(invoke).toHaveBeenCalledWith("hide_panel")
   })
 })

@@ -253,7 +253,7 @@ export function SideNav({
       <NavButton
         isActive={false}
         onClick={() => {
-          openUrl("https://github.com/datell1357/AI-Usage-for-Windows/").catch(console.error)
+          openUrl("https://github.com/datell1357/AI-Usage-for-Windows").catch(console.error)
           invoke("hide_panel").catch(console.error)
         }}
         aria-label="Help"

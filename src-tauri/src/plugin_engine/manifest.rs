@@ -3,6 +3,7 @@ use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
 const SUPPORTED_PLUGIN_IDS: &[&str] = &["antigravity", "claude", "codex", "cursor", "gemini"];
+const DEFAULT_PLUGIN_ORDER: &[&str] = &["claude", "codex", "gemini", "antigravity", "cursor"];
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -71,7 +72,19 @@ pub fn load_plugins_from_dir(plugins_dir: &std::path::Path) -> Vec<LoadedPlugin>
         }
     }
 
-    plugins.sort_by(|a, b| a.manifest.id.cmp(&b.manifest.id));
+    plugins.sort_by(|a, b| {
+        let a_order = DEFAULT_PLUGIN_ORDER
+            .iter()
+            .position(|id| *id == a.manifest.id)
+            .unwrap_or(usize::MAX);
+        let b_order = DEFAULT_PLUGIN_ORDER
+            .iter()
+            .position(|id| *id == b.manifest.id)
+            .unwrap_or(usize::MAX);
+        a_order
+            .cmp(&b_order)
+            .then_with(|| a.manifest.id.cmp(&b.manifest.id))
+    });
     plugins
 }
 
@@ -165,6 +178,31 @@ mod tests {
 
     fn parse_manifest(json: &str) -> PluginManifest {
         serde_json::from_str::<PluginManifest>(json).expect("manifest parse failed")
+    }
+
+    fn write_test_plugin(root: &Path, id: &str, name: &str) {
+        let dir = root.join(id);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("plugin.js"), "globalThis.__ai_usage_plugin = {};").unwrap();
+        std::fs::write(dir.join("icon.svg"), "<svg xmlns=\"http://www.w3.org/2000/svg\"/>").unwrap();
+        std::fs::write(
+            dir.join("plugin.json"),
+            format!(
+                r#"{{
+                  "schemaVersion": 1,
+                  "id": "{id}",
+                  "name": "{name}",
+                  "version": "0.0.1",
+                  "entry": "plugin.js",
+                  "icon": "icon.svg",
+                  "brandColor": null,
+                  "lines": [
+                    {{ "type": "progress", "label": "A", "scope": "overview" }}
+                  ]
+                }}"#
+            ),
+        )
+        .unwrap();
     }
 
     #[test]
@@ -309,5 +347,33 @@ mod tests {
         assert!(is_supported_plugin_id("cursor"));
         assert!(is_supported_plugin_id("gemini"));
         assert!(!is_supported_plugin_id("copilot"));
+    }
+
+    #[test]
+    fn load_plugins_uses_default_provider_order() {
+        let dir = std::env::temp_dir().join(format!(
+            "ai-usage-test-plugins-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        write_test_plugin(&dir, "cursor", "Cursor");
+        write_test_plugin(&dir, "antigravity", "Antigravity");
+        write_test_plugin(&dir, "gemini", "Gemini");
+        write_test_plugin(&dir, "codex", "Codex");
+        write_test_plugin(&dir, "claude", "Claude");
+
+        let plugins = load_plugins_from_dir(&dir);
+        let ids: Vec<_> = plugins
+            .iter()
+            .map(|plugin| plugin.manifest.id.as_str())
+            .collect();
+
+        assert_eq!(ids, vec!["claude", "codex", "gemini", "antigravity", "cursor"]);
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

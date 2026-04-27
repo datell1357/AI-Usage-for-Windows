@@ -6,7 +6,7 @@ use std::sync::{Mutex, OnceLock};
 
 const CACHE_FILE_NAME: &str = "usage-api-cache.json";
 const SETTINGS_FILE_NAME: &str = "settings.json";
-const DEFAULT_ENABLED_PLUGINS: &[&str] = &["claude", "codex"];
+const DEFAULT_ENABLED_PLUGINS: &[&str] = &["claude", "codex", "gemini", "antigravity"];
 
 // ---------------------------------------------------------------------------
 // Types
@@ -277,11 +277,13 @@ mod tests {
     }
 
     #[test]
-    fn default_enabled_plugins_are_claude_and_codex_only() {
+    fn default_enabled_plugins_exclude_cursor() {
         let default_enabled: HashSet<&str> = DEFAULT_ENABLED_PLUGINS.iter().copied().collect();
 
         assert!(default_enabled.contains("claude"));
         assert!(default_enabled.contains("codex"));
+        assert!(default_enabled.contains("gemini"));
+        assert!(default_enabled.contains("antigravity"));
         assert!(!default_enabled.contains("cursor"));
     }
 

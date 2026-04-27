@@ -1,73 +1,108 @@
-# Track all your AI coding subscriptions in one place
+# AI Usage
 
-See your usage at a glance from the Windows tray. No digging through dashboards.
+AI Usage is a Windows tray app for checking AI coding subscription usage at a glance.
 
 ![AI Usage Screenshot](screenshot.png)
 
 ## Download
 
-[**Download the latest Windows release**](https://github.com/datell1357/AI-Usage-for-Windows/releases/latest)
+[Download the latest Windows release](https://github.com/datell1357/AI-Usage-for-Windows/releases/latest)
 
-This Windows fork is under active development at [datell1357/AI-Usage-for-Windows](https://github.com/datell1357/AI-Usage-for-Windows). The first Windows build targets Claude and Codex only.
+The app runs from the Windows system tray, stays out of the taskbar, and opens a compact panel above the tray icon.
 
-The app auto-updates. Install once and you're set.
+## Features
 
-## What It Does
-
-AI Usage lives in your Windows tray and shows you how much of your AI coding subscriptions you've used. Progress bars, badges, and clear labels. No mental math required.
-
-- **One glance.** All your AI tools, one panel.
-- **Always up-to-date.** Refreshes automatically on a schedule you pick.
-- **Global shortcut.** Toggle the panel from anywhere with a customizable keyboard shortcut.
-- **Lightweight.** Opens instantly, stays out of your way.
-- **Plugin-based.** New providers get added without updating the whole app.
-- **[Local HTTP API](docs/local-http-api.md).** Other apps can read your usage data from `127.0.0.1:6736`.
-- **[Proxy support](docs/proxy.md).** Route provider HTTP requests through a SOCKS5 or HTTP proxy.
+- Windows tray-only app with left-click panel toggle and right-click tray menu
+- Global shortcut support
+- Automatic refresh, defaulting to 5 minutes
+- Start on login enabled by default
+- Local HTTP API at `127.0.0.1:6736`
+- Proxy support for provider HTTP requests
+- Plugin-based provider architecture
 
 ## Supported Providers
 
-Windows first build:
+The Windows release currently bundles these providers:
 
-- [**Claude**](docs/providers/claude.md) / session, weekly, peak/off-peak, extra usage, local token usage (ccusage)
-- [**Codex**](docs/providers/codex.md) / session, weekly, reviews, credits
+| Provider | Default | Notes |
+|---|---:|---|
+| [Claude](docs/providers/claude.md) | Enabled | Claude Code OAuth usage, weekly/session limits, extra usage, ccusage local token data |
+| [Codex](docs/providers/codex.md) | Enabled | Codex/ChatGPT OAuth usage, weekly/session limits, reviews, credits |
+| [Gemini](docs/providers/gemini.md) | Enabled | Gemini CLI OAuth credentials and Cloud Code quota APIs |
+| [Antigravity](docs/providers/antigravity.md) | Enabled | Windows SQLite/Cloud Code fallback path |
+| [Cursor](docs/providers/cursor.md) | Disabled | Cursor Desktop SQLite and CLI credential fallback |
 
-Other provider source files remain in the repository, but they are not bundled or enabled in the first Windows build.
+Providers that can be detected and queried successfully appear automatically. Cursor is bundled but left off by default.
 
-Community contributions welcome.
+## Documentation
 
-Want a provider that's not listed? [Open an issue.](https://github.com/datell1357/AI-Usage-for-Windows/issues/new)
+- [Claude provider](docs/providers/claude.md)
+- [Codex provider](docs/providers/codex.md)
+- [Gemini provider](docs/providers/gemini.md)
+- [Antigravity provider](docs/providers/antigravity.md)
+- [Cursor provider](docs/providers/cursor.md)
+- [Plugin API](docs/plugins/api.md)
+- [Local HTTP API](docs/local-http-api.md)
+- [Proxy support](docs/proxy.md)
+- [Capture logs](docs/capture-logs.md)
 
-## Open Source, Community Driven
+## Build From Source
 
-AI Usage is built by its users. Hundreds of people use it daily, and the project grows through community contributions: new providers, bug fixes, and ideas.
+### Requirements
 
-I maintain the project as a guide and quality gatekeeper, but this is your app as much as mine. If something is missing or broken, the best way to get it fixed is to contribute by opening an issue, or submitting a PR.
+- Windows 10 or later
+- Node.js 20+
+- Rust stable MSVC toolchain
+- LLVM installed at `C:\Program Files\LLVM` for the bundled QuickJS build
+- WiX Toolset / NSIS dependencies required by Tauri bundling
 
-Plugins are currently bundled as we build our the API, but soon will be made flexible so you can build and load their own.
+### Install
 
-### How to Contribute
+```powershell
+npm install
+```
 
-- **Add a provider.** Each one is just a plugin. See the [Plugin API](docs/plugins/api.md).
-- **Fix a bug.** PRs welcome. Provide before/after screenshots.
-- **Request a feature.** [Open an issue](https://github.com/datell1357/AI-Usage-for-Windows/issues/new) and make your case.
+### Test
 
-Keep it simple. No feature creep, no AI-generated commit messages, test your changes.
+```powershell
+npm.cmd test
+```
+
+Focused provider tests:
+
+```powershell
+npm.cmd test -- plugins/gemini/plugin.test.js plugins/antigravity/plugin.test.js
+```
+
+### Build Frontend
+
+```powershell
+npm.cmd run build
+```
+
+### Build Windows Installers
+
+```powershell
+$env:Path="$env:USERPROFILE\.cargo\bin;C:\Program Files\LLVM\bin;$env:Path"
+$env:LIBCLANG_PATH="C:\Program Files\LLVM\bin"
+npm.cmd run tauri -- build
+```
+
+Installers are written to:
+
+- `src-tauri\target\release\bundle\nsis\AI Usage_0.1.0_x64-setup.exe`
+- `src-tauri\target\release\bundle\msi\AI Usage_0.1.0_x64_en-US.msi`
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Keep changes focused, include validation evidence, and avoid unrelated refactors.
 
 ## Credits
 
-AI Usage is based on MIT-licensed upstream source code and keeps the original copyright notice in [LICENSE](LICENSE).
+Built by [Yeoreum](https://www.threads.com/@mini.yeoreum).
+
+AI Usage is based on MIT-licensed upstream source code and keeps the original copyright notice in [LICENSE](LICENSE). This repository uses the AI Usage name and assets for the Windows project and does not present itself as an official upstream release.
 
 ## License
 
 [MIT](LICENSE)
-
----
-
-<details>
-<summary><strong>Build from source</strong></summary>
-
-> **Warning**: The `main` branch may not be stable. It is merged directly without staging, so users are advised to use tagged versions for stable builds. Tagged versions are fully tested while `main` may contain unreleased features.
-
-### Stack
-
-...

@@ -2,7 +2,7 @@
 name = "ai-usage"
 version = "0.1.0"
 description = "AI Usage is an open source AI subscription limit tracker"
-authors = ["Robin Ebers"]
+authors = ["Yeoreum"]
 edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

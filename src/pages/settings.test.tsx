@@ -47,7 +47,7 @@ const defaultProps = {
   plugins: [{ id: "a", name: "Alpha", enabled: true }],
   onReorder: vi.fn(),
   onToggle: vi.fn(),
-  autoUpdateInterval: 15 as const,
+  autoUpdateInterval: 5 as const,
   onAutoUpdateIntervalChange: vi.fn(),
   themeMode: "system" as const,
   onThemeModeChange: vi.fn(),
@@ -55,14 +55,7 @@ const defaultProps = {
   onDisplayModeChange: vi.fn(),
   resetTimerDisplayMode: "relative" as const,
   onResetTimerDisplayModeChange: vi.fn(),
-  menubarIconStyle: "provider" as const,
-  onMenubarIconStyleChange: vi.fn(),
-  traySettingsPreview: {
-    bars: [{ id: "a", fraction: 0.7 }],
-    providerBars: [{ id: "a", fraction: 0.7 }],
-    providerIconUrl: "icon-a",
-    providerPercentText: "70%",
-  },
+
   globalShortcut: null,
   onGlobalShortcutChange: vi.fn(),
   startOnLogin: false,
@@ -191,29 +184,11 @@ describe("SettingsPage", () => {
     expect(screen.getByText("Reset Timers")).toBeInTheDocument()
   })
 
-  it("renders tray icon section", () => {
+  it("does not render tray icon section", () => {
     render(<SettingsPage {...defaultProps} />)
-    expect(screen.getByText("Tray Icon")).toBeInTheDocument()
-    expect(screen.getByText("What shows in the tray")).toBeInTheDocument()
-  })
-
-  it("clicking Bars triggers onMenubarIconStyleChange(\"bars\")", async () => {
-    const onMenubarIconStyleChange = vi.fn()
-    render(
-      <SettingsPage
-        {...defaultProps}
-        onMenubarIconStyleChange={onMenubarIconStyleChange}
-      />
-    )
-    await userEvent.click(screen.getByRole("radio", { name: "Bars" }))
-    expect(onMenubarIconStyleChange).toHaveBeenCalledWith("bars")
-  })
-
-  it("only renders Bars as the tray icon style option", () => {
-    render(<SettingsPage {...defaultProps} />)
-    expect(screen.getByRole("radio", { name: "Bars" })).toBeInTheDocument()
-    expect(screen.queryByRole("radio", { name: "Plugin" })).not.toBeInTheDocument()
-    expect(screen.queryByRole("radio", { name: "Donut" })).not.toBeInTheDocument()
+    expect(screen.queryByText("Tray Icon")).not.toBeInTheDocument()
+    expect(screen.queryByText("What shows in the tray")).not.toBeInTheDocument()
+    expect(screen.queryByRole("radio", { name: "Bars" })).not.toBeInTheDocument()
   })
 
   it("does not render removed bar icon controls", () => {

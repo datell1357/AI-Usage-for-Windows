@@ -54,12 +54,12 @@ vi.mock("@tauri-apps/plugin-autostart", () => ({
 
 vi.mock("@/lib/settings", () => ({
   arePluginSettingsEqual: arePluginSettingsEqualMock,
-  DEFAULT_AUTO_UPDATE_INTERVAL: 15,
+  DEFAULT_AUTO_UPDATE_INTERVAL: 5,
   DEFAULT_DISPLAY_MODE: "left",
   DEFAULT_GLOBAL_SHORTCUT: null,
   DEFAULT_MENUBAR_ICON_STYLE: "bars",
   DEFAULT_RESET_TIMER_DISPLAY_MODE: "relative",
-  DEFAULT_START_ON_LOGIN: false,
+  DEFAULT_START_ON_LOGIN: true,
   DEFAULT_THEME_MODE: "system",
   getEnabledPluginIds: getEnabledPluginIdsMock,
   loadAutoUpdateInterval: loadAutoUpdateIntervalMock,

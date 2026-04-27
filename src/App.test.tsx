@@ -701,30 +701,13 @@ describe("App", () => {
     expect(state.saveDisplayModeMock).toHaveBeenCalledWith("used")
   })
 
-  it("settings UI persists menubar icon style change", async () => {
+  it("settings UI does not render tray icon controls", async () => {
     render(<App />)
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
 
-    expect(screen.getByText("Tray Icon")).toBeVisible()
-    const barsRadio = await screen.findByRole("radio", { name: "Bars" })
-    await userEvent.click(barsRadio)
-    expect(state.saveMenubarIconStyleMock).toHaveBeenCalledWith("bars")
-
-    await waitFor(() => {
-      const latestCall = state.renderTrayBarsIconMock.mock.calls.at(-1)?.[0]
-      expect(latestCall).toBeDefined()
-      expect(latestCall!.style).toBe("bars")
-    })
-  })
-
-  it("settings UI hides removed menubar icon style choices", async () => {
-    render(<App />)
-    const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
-    await userEvent.click(settingsButtons[0])
-
-    expect(screen.getByText("Tray Icon")).toBeVisible()
-    expect(await screen.findByRole("radio", { name: "Bars" })).toBeVisible()
+    expect(screen.queryByText("Tray Icon")).not.toBeInTheDocument()
+    expect(screen.queryByRole("radio", { name: "Bars" })).not.toBeInTheDocument()
     expect(screen.queryByRole("radio", { name: "Plugin" })).not.toBeInTheDocument()
     expect(screen.queryByRole("radio", { name: "Donut" })).not.toBeInTheDocument()
   })
@@ -922,20 +905,6 @@ describe("App", () => {
     errorSpy.mockRestore()
   })
 
-  it("logs error when saving menubar icon style fails", async () => {
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
-    state.saveMenubarIconStyleMock.mockRejectedValueOnce(new Error("save menubar icon style failed"))
-
-    render(<App />)
-    const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
-    await userEvent.click(settingsButtons[0])
-    await userEvent.click(await screen.findByRole("radio", { name: "Bars" }))
-
-    await waitFor(() =>
-      expect(errorSpy).toHaveBeenCalledWith("Failed to save menubar icon style:", expect.any(Error))
-    )
-    errorSpy.mockRestore()
-  })
 
   it("retries a plugin on error", async () => {
     render(<App />)

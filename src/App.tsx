@@ -95,7 +95,7 @@ function App() {
     onProbeResult: handleProbeResult,
   })
 
-  const { scheduleTrayIconUpdate, traySettingsPreview } = useTrayIcon({
+  const { scheduleTrayIconUpdate } = useTrayIcon({
     pluginsMeta,
     pluginSettings,
     pluginStates,
@@ -132,7 +132,6 @@ function App() {
     handleDisplayModeChange,
     handleResetTimerDisplayModeChange,
     handleResetTimerDisplayModeToggle,
-    handleMenubarIconStyleChange,
   } = useSettingsDisplayActions({
     setThemeMode,
     setDisplayMode,
@@ -246,8 +245,6 @@ function App() {
         onDisplayModeChange: handleDisplayModeChange,
         onResetTimerDisplayModeChange: handleResetTimerDisplayModeChange,
         onResetTimerDisplayModeToggle: handleResetTimerDisplayModeToggle,
-        onMenubarIconStyleChange: handleMenubarIconStyleChange,
-        traySettingsPreview,
         onGlobalShortcutChange: handleGlobalShortcutChange,
         onStartOnLoginChange: handleStartOnLoginChange,
       }}

@@ -8,6 +8,7 @@ const TRAY_TRACK_COLOR = "#FFFFFF"
 const TRAY_FILL_COLOR = "#22C55E"
 const TRAY_TEXT_COLOR = "#FFFFFF"
 const TRAY_FALLBACK_STROKE_COLOR = "#FFFFFF"
+const PROVIDER_BADGE_FILL = "#FFFFFF"
 const BARS_TRACK_OPACITY = 0.95
 const BARS_REMAINDER_OPACITY = 0.95
 const BARS_FILL_OPACITY = 1
@@ -216,8 +217,13 @@ export function makeTrayBarsSvg(args: {
     const href = typeof providerIconUrl === "string" ? providerIconUrl.trim() : ""
 
     if (href.length > 0) {
+      const badgeRadius = Math.max(3, Math.round(iconSize * 0.24))
+      const imageInset = Math.max(1, Math.round(iconSize * 0.12))
       parts.push(
-        `<image x="${x}" y="${y}" width="${iconSize}" height="${iconSize}" href="${escapeXmlText(href)}" preserveAspectRatio="xMidYMid meet" />`
+        `<rect x="${x}" y="${y}" width="${iconSize}" height="${iconSize}" rx="${badgeRadius}" fill="${PROVIDER_BADGE_FILL}" opacity="0.96" />`
+      )
+      parts.push(
+        `<image x="${x + imageInset}" y="${y + imageInset}" width="${iconSize - 2 * imageInset}" height="${iconSize - 2 * imageInset}" href="${escapeXmlText(href)}" preserveAspectRatio="xMidYMid meet" />`
       )
     } else {
       const cx = x + iconSize / 2
@@ -235,8 +241,13 @@ export function makeTrayBarsSvg(args: {
     const href = typeof providerIconUrl === "string" ? providerIconUrl.trim() : ""
 
     if (href.length > 0) {
+      const badgeRadius = Math.max(3, Math.round(iconSize * 0.24))
+      const imageInset = Math.max(1, Math.round(iconSize * 0.12))
       parts.push(
-        `<image x="${iconX}" y="${iconY}" width="${iconSize}" height="${iconSize}" href="${escapeXmlText(href)}" preserveAspectRatio="xMidYMid meet" />`
+        `<rect x="${iconX}" y="${iconY}" width="${iconSize}" height="${iconSize}" rx="${badgeRadius}" fill="${PROVIDER_BADGE_FILL}" opacity="0.96" />`
+      )
+      parts.push(
+        `<image x="${iconX + imageInset}" y="${iconY + imageInset}" width="${iconSize - 2 * imageInset}" height="${iconSize - 2 * imageInset}" href="${escapeXmlText(href)}" preserveAspectRatio="xMidYMid meet" />`
       )
     } else {
       const fcx = iconX + iconSize / 2

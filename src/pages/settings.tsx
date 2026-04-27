@@ -63,25 +63,26 @@ function ProviderIconMask({
   isActive: boolean;
   sizePx: number;
 }) {
-  const colorClass = isActive ? "bg-primary-foreground" : "bg-foreground";
   if (iconUrl) {
     return (
       <div
         aria-hidden
-        className={cn("shrink-0", colorClass)}
+        className={cn(
+          "shrink-0 rounded-[5px] bg-white shadow-[0_0_0_1px_rgba(15,23,42,0.08)] flex items-center justify-center",
+          isActive ? "opacity-100" : "opacity-95"
+        )}
         style={{
           width: `${sizePx}px`,
           height: `${sizePx}px`,
-          WebkitMaskImage: `url(${iconUrl})`,
-          WebkitMaskSize: "contain",
-          WebkitMaskRepeat: "no-repeat",
-          WebkitMaskPosition: "center",
-          maskImage: `url(${iconUrl})`,
-          maskSize: "contain",
-          maskRepeat: "no-repeat",
-          maskPosition: "center",
         }}
-      />
+      >
+        <img
+          src={iconUrl}
+          alt=""
+          className="block h-[76%] w-[76%] object-contain"
+          draggable={false}
+        />
+      </div>
     );
   }
   const textClass = isActive ? "text-primary-foreground" : "text-foreground";
@@ -119,9 +120,9 @@ function MenubarIconStylePreview({
   }
 
   if (style === "bars") {
-    const trackClass = isActive ? "bg-primary-foreground/15" : "bg-foreground/15";
-    const remainderClass = isActive ? "bg-primary-foreground/20" : "bg-foreground/15";
-    const fillClass = isActive ? "bg-primary-foreground" : "bg-foreground";
+    const trackClass = "bg-white";
+    const remainderClass = "bg-white";
+    const fillClass = "bg-green-500";
     const fractions = traySettingsPreview.bars.length > 0
       ? traySettingsPreview.bars.map((b) => b.fraction ?? 0)
       : [0.83, 0.7, 0.56];

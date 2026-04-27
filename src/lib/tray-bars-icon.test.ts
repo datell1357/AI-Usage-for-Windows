@@ -31,7 +31,7 @@ describe("tray-bars-icon", () => {
       providerIconUrl: "data:image/svg+xml;base64,ABC",
     })
     expect(svg).toContain("<image ")
-    expect(svg).not.toContain("<rect ")
+    expect(svg).toContain('fill="#FFFFFF"')
     expect(svg).not.toContain("<path ")
   })
 
@@ -77,7 +77,7 @@ describe("tray-bars-icon", () => {
     })
     expect(svg).toContain('stroke-dasharray="')
     expect(svg).toContain("<image ")
-    expect(svg).not.toContain("<rect ")
+    expect(svg).toContain('fill="#FFFFFF"')
   })
 
   it("style=donut falls back to center glyph when provider icon is missing", () => {

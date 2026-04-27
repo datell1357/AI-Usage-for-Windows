@@ -81,13 +81,13 @@ describe("SideNav", () => {
     expect(p2Style).toContain("rgb(255, 255, 255)")
   })
 
-  it("opens the issues page and hides the panel from Help", async () => {
+  it("opens the project page and hides the panel from Help", async () => {
     const onViewChange = vi.fn()
     render(<SideNav activeView="home" onViewChange={onViewChange} plugins={[]} />)
 
     await userEvent.click(screen.getByRole("button", { name: "Help" }))
 
-    expect(openUrl).toHaveBeenCalledWith("https://github.com/datell1357/AI-Usage-for-Windows/issues")
+    expect(openUrl).toHaveBeenCalledWith("https://github.com/datell1357/AI-Usage-for-Windows/")
     expect(invoke).toHaveBeenCalledWith("hide_panel")
   })
 })

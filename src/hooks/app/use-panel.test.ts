@@ -341,4 +341,24 @@ describe("usePanel", () => {
     document.body.removeChild(container)
     requestAnimationFrameSpy.mockRestore()
   })
+
+  it("hides the panel when the window loses focus", () => {
+    renderHook(() =>
+      usePanel({
+        activeView: "home",
+        setActiveView: vi.fn(),
+        showAbout: false,
+        setShowAbout: vi.fn(),
+        displayPlugins: [],
+      })
+    )
+
+    invokeMock.mockClear()
+
+    act(() => {
+      window.dispatchEvent(new Event("blur"))
+    })
+
+    expect(invokeMock).toHaveBeenCalledWith("hide_panel")
+  })
 })

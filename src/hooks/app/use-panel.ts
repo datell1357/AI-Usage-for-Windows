@@ -69,6 +69,17 @@ export function usePanel({
 
   useEffect(() => {
     if (!isTauri()) return
+
+    const handleBlur = () => {
+      invoke("hide_panel").catch(console.error)
+    }
+
+    window.addEventListener("blur", handleBlur)
+    return () => window.removeEventListener("blur", handleBlur)
+  }, [])
+
+  useEffect(() => {
+    if (!isTauri()) return
     if (showAbout) return
 
     const handleKeyDown = (e: KeyboardEvent) => {

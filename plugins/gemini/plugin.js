@@ -3,6 +3,7 @@
   const CREDS_PATH = "~/.gemini/oauth_creds.json"
   const OAUTH2_SUFFIX_FLAT = "/@google/gemini-cli-core/dist/src/code_assist/oauth2.js"
   const OAUTH2_SUFFIX_NESTED = "/@google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/code_assist/oauth2.js"
+  const BUNDLE_ROOT_SUFFIX = "/@google/gemini-cli/bundle"
 
   const STATIC_MODULE_ROOTS = [
     "~/.bun/install/global/node_modules",
@@ -12,6 +13,14 @@
     "~/.npm-global/lib/node_modules",
     "/usr/local/lib/node_modules",
     "~/Library/pnpm/global/5/node_modules",
+    "~/AppData/Local/pnpm/global/5/node_modules",
+    "%LOCALAPPDATA%\\pnpm\\global\\5\\node_modules",
+  ]
+
+  const BUNDLE_MODULE_ROOTS = [
+    "~/AppData/Roaming/npm/node_modules",
+    "%APPDATA%\\npm\\node_modules",
+    "~/.bun/install/global/node_modules",
     "~/AppData/Local/pnpm/global/5/node_modules",
     "%LOCALAPPDATA%\\pnpm\\global\\5\\node_modules",
   ]
@@ -64,6 +73,17 @@
     paths.push("~/AppData/Local/Volta/tools/image/packages/@google/gemini-cli/lib/node_modules" + OAUTH2_SUFFIX_FLAT)
     paths.push("%LOCALAPPDATA%\\Volta\\tools\\image\\packages\\@google\\gemini-cli\\lib\\node_modules" + OAUTH2_SUFFIX_NESTED)
     paths.push("%LOCALAPPDATA%\\Volta\\tools\\image\\packages\\@google\\gemini-cli\\lib\\node_modules" + OAUTH2_SUFFIX_FLAT)
+
+    for (var k = 0; k < BUNDLE_MODULE_ROOTS.length; k += 1) {
+      var bundleRoot = BUNDLE_MODULE_ROOTS[k] + BUNDLE_ROOT_SUFFIX
+      var entries = listDirSafe(ctx, bundleRoot)
+      for (var l = 0; l < entries.length; l += 1) {
+        var entry = String(entries[l])
+        if (/^(chunk-|gemini\.js|oauth2-provider-).+\.js$/.test(entry) || entry === "gemini.js") {
+          paths.push(bundleRoot + "/" + entry)
+        }
+      }
+    }
 
     return paths
   }
@@ -129,8 +149,8 @@
 
   function parseOauthClientCreds(text) {
     if (!text || typeof text !== "string") return null
-    const idMatch = text.match(/OAUTH_CLIENT_ID\s*=\s*['"]([^'"]+)['"]/)
-    const secretMatch = text.match(/OAUTH_CLIENT_SECRET\s*=\s*['"]([^'"]+)['"]/)
+    const idMatch = text.match(/(?:const|let|var)\s+OAUTH_CLIENT_ID\s*=\s*['"]([^'"]+)['"]/)
+    const secretMatch = text.match(/(?:const|let|var)\s+OAUTH_CLIENT_SECRET\s*=\s*['"]([^'"]+)['"]/)
     if (!idMatch || !secretMatch) return null
     return { clientId: idMatch[1], clientSecret: secretMatch[1] }
   }

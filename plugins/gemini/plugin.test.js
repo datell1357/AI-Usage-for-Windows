@@ -930,6 +930,55 @@ describe("gemini plugin", () => {
     expect(result.lines.find((line) => line.label === "Pro")).toBeTruthy()
   })
 
+  it("discovers OAuth client creds from bundled Gemini CLI chunks on Windows", async () => {
+    const ctx = makeCtx()
+    const nowMs = 1_700_000_000_000
+    vi.spyOn(Date, "now").mockReturnValue(nowMs)
+
+    const bundleRoot = "%APPDATA%\\npm\\node_modules/@google/gemini-cli/bundle"
+    const bundledChunk = bundleRoot + "/chunk-GDRLBWZL.js"
+
+    ctx.host.fs.writeText(
+      CREDS_PATH,
+      JSON.stringify({
+        access_token: "old-token",
+        refresh_token: "refresh-token",
+        expiry_date: nowMs - 1000,
+      })
+    )
+    ctx.host.fs.writeText(
+      bundledChunk,
+      'var OAUTH_CLIENT_ID = "bundle-client-id"; var OAUTH_CLIENT_SECRET = "bundle-client-secret";'
+    )
+
+    ctx.host.http.request.mockImplementation((opts) => {
+      const url = String(opts.url)
+      if (url === TOKEN_URL) {
+        expect(opts.bodyText).toContain("bundle-client-id")
+        expect(opts.bodyText).toContain("bundle-client-secret")
+        return { status: 200, bodyText: JSON.stringify({ access_token: "bundle-token", expires_in: 3600 }) }
+      }
+      if (url === LOAD_CODE_ASSIST_URL) return { status: 200, bodyText: JSON.stringify({ tier: "standard-tier" }) }
+      if (url === PROJECTS_URL) {
+        return { status: 200, bodyText: JSON.stringify({ projects: [{ projectId: "gen-lang-client-bundle" }] }) }
+      }
+      if (url === QUOTA_URL) {
+        expect(opts.headers.Authorization).toBe("Bearer bundle-token")
+        return {
+          status: 200,
+          bodyText: JSON.stringify({
+            quotaBuckets: [{ modelId: "gemini-2.5-pro", remainingFraction: 0.5, resetTime: "2099-01-01T00:00:00Z" }],
+          }),
+        }
+      }
+      throw new Error("unexpected url: " + url)
+    })
+
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+    expect(result.lines.find((line) => line.label === "Pro")).toBeTruthy()
+  })
+
   it("uses snake_case quota fields and still renders lines", async () => {
     const ctx = makeCtx()
     const nowMs = 1_700_000_000_000

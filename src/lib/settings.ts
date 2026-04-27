@@ -78,7 +78,7 @@ export const RESET_TIMER_DISPLAY_OPTIONS: { value: ResetTimerDisplayMode; label:
 
 const store = new LazyStore(SETTINGS_STORE_PATH);
 
-const DEFAULT_ENABLED_PLUGINS = new Set(["claude", "codex", "cursor"]);
+const DEFAULT_ENABLED_PLUGINS = new Set(["claude", "codex"]);
 
 export const DEFAULT_PLUGIN_SETTINGS: PluginSettings = {
   order: [],

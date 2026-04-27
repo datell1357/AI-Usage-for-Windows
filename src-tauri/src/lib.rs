@@ -367,11 +367,35 @@ async fn start_probe_batch(
 
 #[tauri::command]
 fn get_log_path(app_handle: tauri::AppHandle) -> Result<String, String> {
-    // macOS log directory: ~/Library/Logs/{bundleIdentifier}
-    let home = dirs::home_dir().ok_or("no home dir")?;
-    let bundle_id = app_handle.config().identifier.clone();
-    let log_dir = home.join("Library").join("Logs").join(&bundle_id);
-    let log_file = log_dir.join(format!("{}.log", app_handle.package_info().name));
+    let log_file = {
+        #[cfg(target_os = "macos")]
+        {
+            // macOS log directory: ~/Library/Logs/{bundleIdentifier}
+            let home = dirs::home_dir().ok_or("no home dir")?;
+            let bundle_id = app_handle.config().identifier.clone();
+            home.join("Library")
+                .join("Logs")
+                .join(&bundle_id)
+                .join(format!("{}.log", app_handle.package_info().name))
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            use tauri::Manager;
+
+            app_handle
+                .path()
+                .app_log_dir()
+                .map_err(|error| error.to_string())?
+                .join(format!("{}.log", app_handle.package_info().name))
+        }
+
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        {
+            return Err("unsupported platform".to_string());
+        }
+    };
+
     Ok(log_file.to_string_lossy().to_string())
 }
 

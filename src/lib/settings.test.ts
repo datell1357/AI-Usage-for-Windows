@@ -94,12 +94,13 @@ describe("settings", () => {
   it("auto-disables new non-default plugins", () => {
     const plugins: PluginMeta[] = [
       { id: "claude", name: "Claude", iconUrl: "", lines: [], primaryCandidates: [] },
+      { id: "codex", name: "Codex", iconUrl: "", lines: [], primaryCandidates: [] },
+      { id: "cursor", name: "Cursor", iconUrl: "", lines: [], primaryCandidates: [] },
       { id: "copilot", name: "Copilot", iconUrl: "", lines: [], primaryCandidates: [] },
-      { id: "windsurf", name: "Windsurf", iconUrl: "", lines: [], primaryCandidates: [] },
     ]
     const result = normalizePluginSettings({ order: [], disabled: [] }, plugins)
-    expect(result.order).toEqual(["claude", "copilot", "windsurf"])
-    expect(result.disabled).toEqual(["copilot", "windsurf"])
+    expect(result.order).toEqual(["claude", "codex", "cursor", "copilot"])
+    expect(result.disabled).toEqual(["cursor", "copilot"])
   })
 
   it("compares settings equality", () => {

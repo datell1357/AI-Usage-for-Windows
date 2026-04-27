@@ -59,6 +59,7 @@ AI Usage는 Windows 시스템 트레이에서만 동작하며 작업표시줄에
 - [Proxy support](docs/proxy.md)
 - [Capture logs](docs/capture-logs.md)
 - [개인정보 처리방침](PRIVACY.md)
+- [Microsoft Store MSIX 제출](docs/microsoft-store-msix.md)
 
 ### 소스에서 빌드
 
@@ -176,6 +177,7 @@ Provider usage appears when the corresponding third-party tool is installed on t
 - [Proxy support](docs/proxy.md)
 - [Capture logs](docs/capture-logs.md)
 - [Privacy Policy](PRIVACY.md)
+- [Microsoft Store MSIX submission](docs/microsoft-store-msix.md)
 
 ### Build From Source
 

@@ -115,9 +115,12 @@ fn position_window_near_tray(
         let work_area = monitor.work_area();
         let origin = work_area.position;
         let size = work_area.size;
-        let x = origin.x + PANEL_MARGIN;
+        let x = origin.x + size.width as i32 - panel_size.width as i32 - PANEL_MARGIN;
         let y = origin.y + size.height as i32 - panel_size.height as i32 - PANEL_MARGIN;
-        let _ = window.set_position(PhysicalPosition::new(x, y.max(origin.y + PANEL_MARGIN)));
+        let _ = window.set_position(PhysicalPosition::new(
+            x.max(origin.x + PANEL_MARGIN),
+            y.max(origin.y + PANEL_MARGIN),
+        ));
     }
 }
 

@@ -151,11 +151,13 @@ AI Usage reads Cursor auth in this order:
 
 #### 1) Cursor Desktop SQLite (preferred)
 
-Path: `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb`
+Paths:
 
-```bash
-sqlite3 ~/Library/Application\ Support/Cursor/User/globalStorage/state.vscdb \
-  "SELECT value FROM ItemTable WHERE key = 'cursorAuth/accessToken'"
+- Windows: `%APPDATA%\Cursor\User\globalStorage\state.vscdb`
+- macOS fallback: `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb`
+
+```sql
+SELECT value FROM ItemTable WHERE key = 'cursorAuth/accessToken';
 ```
 
 | Key | Description |

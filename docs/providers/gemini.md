@@ -8,6 +8,10 @@ Tracks Gemini CLI usage through local OAuth credentials and Gemini quota APIs.
 - `~/.gemini/oauth_creds.json` for OAuth tokens
 - Gemini CLI `oauth2.js` for OAuth client ID/secret
 
+On Windows, AI Usage searches common npm, pnpm, Bun, and Volta global install
+locations under `%APPDATA%`, `%LOCALAPPDATA%`, and the user profile. On macOS,
+it keeps the existing Homebrew, nvm, fnm, pnpm, Bun, and Volta locations.
+
 ## Supported auth modes
 
 - `oauth-personal`

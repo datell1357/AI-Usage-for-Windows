@@ -140,6 +140,36 @@ describe("cursor plugin", () => {
     expect(ctx.host.keychain.readGenericPassword).toHaveBeenCalledWith("cursor-refresh-token")
   })
 
+  it("queries Windows Cursor state DB path first on Windows", async () => {
+    const ctx = makeCtx()
+    const sqliteToken = makeJwt({ exp: 9999999999 })
+    const queriedPaths = []
+
+    ctx.host.sqlite.query.mockImplementation((db, sql) => {
+      queriedPaths.push(db)
+      if (String(sql).includes("cursorAuth/accessToken")) {
+        return JSON.stringify([{ value: sqliteToken }])
+      }
+      if (String(sql).includes("cursorAuth/refreshToken")) {
+        return JSON.stringify([{ value: "sqlite-refresh-token" }])
+      }
+      return JSON.stringify([])
+    })
+    ctx.host.http.request.mockReturnValue({
+      status: 200,
+      bodyText: JSON.stringify({
+        enabled: true,
+        planUsage: { totalSpend: 1200, limit: 2400 },
+      }),
+    })
+
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+
+    expect(result.lines.find((line) => line.label === "Total usage")).toBeTruthy()
+    expect(queriedPaths[0]).toBe("%APPDATA%\\Cursor\\User\\globalStorage\\state.vscdb")
+  })
+
   it("prefers keychain when sqlite looks free and token subjects differ", async () => {
     const ctx = makeCtx()
     const sqlitePayload = Buffer.from(

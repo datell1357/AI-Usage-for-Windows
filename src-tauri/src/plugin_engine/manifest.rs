@@ -2,7 +2,7 @@ use base64::{Engine, engine::general_purpose::STANDARD};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
-const SUPPORTED_PLUGIN_IDS: &[&str] = &["claude", "codex"];
+const SUPPORTED_PLUGIN_IDS: &[&str] = &["claude", "codex", "cursor", "gemini"];
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -66,10 +66,7 @@ pub fn load_plugins_from_dir(plugins_dir: &std::path::Path) -> Vec<LoadedPlugin>
             if is_supported_plugin_id(&p.manifest.id) {
                 plugins.push(p);
             } else {
-                log::debug!(
-                    "skipping unsupported bundled plugin {}",
-                    p.manifest.id
-                );
+                log::debug!("skipping unsupported bundled plugin {}", p.manifest.id);
             }
         }
     }
@@ -305,10 +302,11 @@ mod tests {
     }
 
     #[test]
-    fn supported_plugin_ids_are_limited_to_claude_and_codex() {
+    fn supported_plugin_ids_are_limited_to_windows_enabled_providers() {
         assert!(is_supported_plugin_id("claude"));
         assert!(is_supported_plugin_id("codex"));
-        assert!(!is_supported_plugin_id("cursor"));
+        assert!(is_supported_plugin_id("cursor"));
+        assert!(is_supported_plugin_id("gemini"));
         assert!(!is_supported_plugin_id("copilot"));
     }
 }

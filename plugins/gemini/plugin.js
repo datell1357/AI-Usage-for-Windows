@@ -6,9 +6,14 @@
 
   const STATIC_MODULE_ROOTS = [
     "~/.bun/install/global/node_modules",
+    "~/AppData/Roaming/npm/node_modules",
+    "%APPDATA%\\npm\\node_modules",
+    "%LOCALAPPDATA%\\Programs\\bun\\bin\\node_modules",
     "~/.npm-global/lib/node_modules",
     "/usr/local/lib/node_modules",
     "~/Library/pnpm/global/5/node_modules",
+    "~/AppData/Local/pnpm/global/5/node_modules",
+    "%LOCALAPPDATA%\\pnpm\\global\\5\\node_modules",
   ]
 
   const STATIC_NESTED_ONLY = [
@@ -55,6 +60,10 @@
     // volta stores packages differently
     paths.push("~/.volta/tools/image/packages/@google/gemini-cli/lib/node_modules" + OAUTH2_SUFFIX_NESTED)
     paths.push("~/.volta/tools/image/packages/@google/gemini-cli/lib/node_modules" + OAUTH2_SUFFIX_FLAT)
+    paths.push("~/AppData/Local/Volta/tools/image/packages/@google/gemini-cli/lib/node_modules" + OAUTH2_SUFFIX_NESTED)
+    paths.push("~/AppData/Local/Volta/tools/image/packages/@google/gemini-cli/lib/node_modules" + OAUTH2_SUFFIX_FLAT)
+    paths.push("%LOCALAPPDATA%\\Volta\\tools\\image\\packages\\@google\\gemini-cli\\lib\\node_modules" + OAUTH2_SUFFIX_NESTED)
+    paths.push("%LOCALAPPDATA%\\Volta\\tools\\image\\packages\\@google\\gemini-cli\\lib\\node_modules" + OAUTH2_SUFFIX_FLAT)
 
     return paths
   }

@@ -1,6 +1,10 @@
 (function () {
-  const STATE_DB =
-    "~/Library/Application Support/Cursor/User/globalStorage/state.vscdb"
+  const STATE_DB_CANDIDATES = [
+    "%APPDATA%\\Cursor\\User\\globalStorage\\state.vscdb",
+    "%LOCALAPPDATA%\\Programs\\Cursor\\User\\globalStorage\\state.vscdb",
+    "~/AppData/Roaming/Cursor/User/globalStorage/state.vscdb",
+    "~/Library/Application Support/Cursor/User/globalStorage/state.vscdb",
+  ]
   const KEYCHAIN_ACCESS_TOKEN_SERVICE = "cursor-access-token"
   const KEYCHAIN_REFRESH_TOKEN_SERVICE = "cursor-refresh-token"
   const BASE_URL = "https://api2.cursor.sh"
@@ -14,12 +18,55 @@
   const REFRESH_BUFFER_MS = 5 * 60 * 1000 // refresh 5 minutes before expiration
   const LOGIN_HINT = "Sign in via Cursor app or run `agent login`."
 
+  function stateDbCandidates(ctx) {
+    if (ctx.app && ctx.app.platform === "windows") {
+      return STATE_DB_CANDIDATES
+    }
+    return [
+      "~/Library/Application Support/Cursor/User/globalStorage/state.vscdb",
+      "%APPDATA%\\Cursor\\User\\globalStorage\\state.vscdb",
+      "~/AppData/Roaming/Cursor/User/globalStorage/state.vscdb",
+    ]
+  }
+
+  function queryStateDb(ctx, sql) {
+    const candidates = stateDbCandidates(ctx)
+    let lastError = null
+    for (let i = 0; i < candidates.length; i += 1) {
+      const dbPath = candidates[i]
+      try {
+        return { json: ctx.host.sqlite.query(dbPath, sql), dbPath }
+      } catch (e) {
+        lastError = e
+      }
+    }
+    if (lastError) throw lastError
+    return null
+  }
+
+  function execStateDb(ctx, sql) {
+    const candidates = stateDbCandidates(ctx)
+    let lastError = null
+    for (let i = 0; i < candidates.length; i += 1) {
+      const dbPath = candidates[i]
+      try {
+        ctx.host.sqlite.exec(dbPath, sql)
+        return true
+      } catch (e) {
+        lastError = e
+      }
+    }
+    if (lastError) throw lastError
+    return false
+  }
+
   function readStateValue(ctx, key) {
     try {
       const sql =
         "SELECT value FROM ItemTable WHERE key = '" + key + "' LIMIT 1;"
-      const json = ctx.host.sqlite.query(STATE_DB, sql)
-      const rows = ctx.util.tryParseJson(json)
+      const result = queryStateDb(ctx, sql)
+      if (!result) return null
+      const rows = ctx.util.tryParseJson(result.json)
       if (!Array.isArray(rows)) {
         throw new Error("sqlite returned invalid json")
       }
@@ -42,8 +89,7 @@
         "', '" +
         escaped +
         "');"
-      ctx.host.sqlite.exec(STATE_DB, sql)
-      return true
+      return execStateDb(ctx, sql)
     } catch (e) {
       ctx.host.log.warn("sqlite write failed for " + key + ": " + String(e))
       return false

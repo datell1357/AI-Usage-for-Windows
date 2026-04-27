@@ -7,11 +7,11 @@ use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use rquickjs::{Ctx, Exception, Function, Object};
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Mutex, OnceLock};
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
 
 #[cfg(target_os = "windows")]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
@@ -150,14 +150,7 @@ fn read_windows_generic_credential(service: &str, account: Option<&str>) -> Resu
     let target_w = windows_wide_null(&target);
     let mut credential: *mut CREDENTIALW = std::ptr::null_mut();
 
-    let ok = unsafe {
-        CredReadW(
-            target_w.as_ptr(),
-            CRED_TYPE_GENERIC,
-            0,
-            &mut credential,
-        )
-    };
+    let ok = unsafe { CredReadW(target_w.as_ptr(), CRED_TYPE_GENERIC, 0, &mut credential) };
 
     if ok == 0 {
         return Err(windows_last_error_message());
@@ -173,10 +166,8 @@ fn read_windows_generic_credential(service: &str, account: Option<&str>) -> Resu
             credential_ref.CredentialBlob,
             credential_ref.CredentialBlobSize as usize,
         );
-        let value =
-            String::from_utf8(blob.to_vec()).map_err(|error| {
-                format!("credential blob is not UTF-8: {}", error)
-            });
+        let value = String::from_utf8(blob.to_vec())
+            .map_err(|error| format!("credential blob is not UTF-8: {}", error));
         CredFree(credential.cast());
         value
     }?;
@@ -1626,11 +1617,7 @@ fn ccusage_runner_candidates(kind: CcusageRunnerKind) -> Vec<String> {
             if let Some(home) = dirs::home_dir() {
                 candidates.push(home.join(".bun/bin/bunx").to_string_lossy().to_string());
                 #[cfg(target_os = "windows")]
-                candidates.push(
-                    home.join(".bun/bin/bunx.exe")
-                        .to_string_lossy()
-                        .to_string(),
-                );
+                candidates.push(home.join(".bun/bin/bunx.exe").to_string_lossy().to_string());
             }
             #[cfg(target_os = "windows")]
             candidates.extend(["bunx.exe", "bunx"].into_iter().map(str::to_string));
@@ -1643,7 +1630,11 @@ fn ccusage_runner_candidates(kind: CcusageRunnerKind) -> Vec<String> {
         }
         CcusageRunnerKind::PnpmDlx => {
             #[cfg(target_os = "windows")]
-            candidates.extend(["pnpm.cmd", "pnpm.exe", "pnpm"].into_iter().map(str::to_string));
+            candidates.extend(
+                ["pnpm.cmd", "pnpm.exe", "pnpm"]
+                    .into_iter()
+                    .map(str::to_string),
+            );
             #[cfg(not(target_os = "windows"))]
             candidates.extend(
                 ["/opt/homebrew/bin/pnpm", "/usr/local/bin/pnpm", "pnpm"]
@@ -1653,7 +1644,11 @@ fn ccusage_runner_candidates(kind: CcusageRunnerKind) -> Vec<String> {
         }
         CcusageRunnerKind::YarnDlx => {
             #[cfg(target_os = "windows")]
-            candidates.extend(["yarn.cmd", "yarn.exe", "yarn"].into_iter().map(str::to_string));
+            candidates.extend(
+                ["yarn.cmd", "yarn.exe", "yarn"]
+                    .into_iter()
+                    .map(str::to_string),
+            );
             #[cfg(not(target_os = "windows"))]
             candidates.extend(
                 ["/opt/homebrew/bin/yarn", "/usr/local/bin/yarn", "yarn"]
@@ -1663,7 +1658,11 @@ fn ccusage_runner_candidates(kind: CcusageRunnerKind) -> Vec<String> {
         }
         CcusageRunnerKind::NpmExec => {
             #[cfg(target_os = "windows")]
-            candidates.extend(["npm.cmd", "npm.exe", "npm"].into_iter().map(str::to_string));
+            candidates.extend(
+                ["npm.cmd", "npm.exe", "npm"]
+                    .into_iter()
+                    .map(str::to_string),
+            );
             #[cfg(not(target_os = "windows"))]
             candidates.extend(
                 ["/opt/homebrew/bin/npm", "/usr/local/bin/npm", "npm"]
@@ -1673,7 +1672,11 @@ fn ccusage_runner_candidates(kind: CcusageRunnerKind) -> Vec<String> {
         }
         CcusageRunnerKind::Npx => {
             #[cfg(target_os = "windows")]
-            candidates.extend(["npx.cmd", "npx.exe", "npx"].into_iter().map(str::to_string));
+            candidates.extend(
+                ["npx.cmd", "npx.exe", "npx"]
+                    .into_iter()
+                    .map(str::to_string),
+            );
             #[cfg(not(target_os = "windows"))]
             candidates.extend(
                 ["/opt/homebrew/bin/npx", "/usr/local/bin/npx", "npx"]
@@ -1711,8 +1714,8 @@ fn ccusage_path_entries_with(home: Option<&Path>, existing_path: Option<&OsStr>)
         }
         #[cfg(not(target_os = "windows"))]
         {
-        entries.push(home.join(".nvm/current/bin"));
-        entries.push(home.join(".local/bin"));
+            entries.push(home.join(".nvm/current/bin"));
+            entries.push(home.join(".local/bin"));
         }
     }
 
@@ -2271,55 +2274,8 @@ fn inject_sqlite<'js>(ctx: &Ctx<'js>, host: &Object<'js>) -> rquickjs::Result<()
         Function::new(
             ctx.clone(),
             move |ctx_inner: Ctx<'_>, db_path: String, sql: String| -> rquickjs::Result<String> {
-                if sql.lines().any(|line| line.trim_start().starts_with('.')) {
-                    return Err(Exception::throw_message(
-                        &ctx_inner,
-                        "sqlite3 dot-commands are not allowed",
-                    ));
-                }
-                let expanded = expand_path(&db_path);
-
-                // Prefer a normal read-only open so WAL contents are visible (common for app state DBs).
-                // Fall back to immutable=1 to bypass WAL/SHM lock issues.
-                let mut primary_command = std::process::Command::new("sqlite3");
-                primary_command.args(["-readonly", "-json", &expanded, &sql]);
-                configure_hidden_command_window(&mut primary_command);
-                let primary = primary_command.output().map_err(|e| {
-                    Exception::throw_message(&ctx_inner, &format!("sqlite3 exec failed: {}", e))
-                })?;
-
-                if primary.status.success() {
-                    return Ok(String::from_utf8_lossy(&primary.stdout).to_string());
-                }
-
-                // Percent-encode special chars for valid URI (% must be first!)
-                let encoded = expanded
-                    .replace('%', "%25")
-                    .replace(' ', "%20")
-                    .replace('#', "%23")
-                    .replace('?', "%3F");
-                let uri_path = format!("file:{}?immutable=1", encoded);
-                let mut fallback_command = std::process::Command::new("sqlite3");
-                fallback_command.args(["-readonly", "-json", &uri_path, &sql]);
-                configure_hidden_command_window(&mut fallback_command);
-                let fallback = fallback_command.output().map_err(|e| {
-                    Exception::throw_message(&ctx_inner, &format!("sqlite3 exec failed: {}", e))
-                })?;
-
-                if !fallback.status.success() {
-                    let stderr_primary = String::from_utf8_lossy(&primary.stderr);
-                    let stderr_fallback = String::from_utf8_lossy(&fallback.stderr);
-                    return Err(Exception::throw_message(
-                        &ctx_inner,
-                        &format!(
-                            "sqlite3 error: {} (fallback: {})",
-                            stderr_primary.trim(),
-                            stderr_fallback.trim()
-                        ),
-                    ));
-                }
-
-                Ok(String::from_utf8_lossy(&fallback.stdout).to_string())
+                sqlite_query_json(&db_path, &sql)
+                    .map_err(|e| Exception::throw_message(&ctx_inner, &e))
             },
         )?,
     )?;
@@ -2329,35 +2285,108 @@ fn inject_sqlite<'js>(ctx: &Ctx<'js>, host: &Object<'js>) -> rquickjs::Result<()
         Function::new(
             ctx.clone(),
             move |ctx_inner: Ctx<'_>, db_path: String, sql: String| -> rquickjs::Result<()> {
-                if sql.lines().any(|line| line.trim_start().starts_with('.')) {
-                    return Err(Exception::throw_message(
-                        &ctx_inner,
-                        "sqlite3 dot-commands are not allowed",
-                    ));
-                }
-                let expanded = expand_path(&db_path);
-                let mut command = std::process::Command::new("sqlite3");
-                command.args([&expanded, &sql]);
-                configure_hidden_command_window(&mut command);
-                let output = command.output().map_err(|e| {
-                    Exception::throw_message(&ctx_inner, &format!("sqlite3 exec failed: {}", e))
-                })?;
-
-                if !output.status.success() {
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    return Err(Exception::throw_message(
-                        &ctx_inner,
-                        &format!("sqlite3 error: {}", stderr.trim()),
-                    ));
-                }
-
-                Ok(())
+                sqlite_exec(&db_path, &sql).map_err(|e| Exception::throw_message(&ctx_inner, &e))
             },
         )?,
     )?;
 
     host.set("sqlite", sqlite_obj)?;
     Ok(())
+}
+
+fn reject_sqlite_dot_commands(sql: &str) -> Result<(), String> {
+    if sql.lines().any(|line| line.trim_start().starts_with('.')) {
+        return Err("sqlite dot-commands are not allowed".to_string());
+    }
+    Ok(())
+}
+
+fn sqlite_value_to_json(value: rusqlite::types::ValueRef<'_>) -> serde_json::Value {
+    match value {
+        rusqlite::types::ValueRef::Null => serde_json::Value::Null,
+        rusqlite::types::ValueRef::Integer(value) => serde_json::Value::Number(value.into()),
+        rusqlite::types::ValueRef::Real(value) => serde_json::Number::from_f64(value)
+            .map(serde_json::Value::Number)
+            .unwrap_or(serde_json::Value::Null),
+        rusqlite::types::ValueRef::Text(value) => {
+            serde_json::Value::String(String::from_utf8_lossy(value).to_string())
+        }
+        rusqlite::types::ValueRef::Blob(value) => {
+            serde_json::Value::String(BASE64_STANDARD.encode(value))
+        }
+    }
+}
+
+fn sqlite_query_json_with_flags(
+    db_path: &str,
+    sql: &str,
+    flags: rusqlite::OpenFlags,
+) -> Result<String, String> {
+    let conn = rusqlite::Connection::open_with_flags(db_path, flags)
+        .map_err(|e| format!("sqlite open failed: {}", e))?;
+    let mut stmt = conn
+        .prepare(sql)
+        .map_err(|e| format!("sqlite prepare failed: {}", e))?;
+    let column_names: Vec<String> = stmt
+        .column_names()
+        .into_iter()
+        .map(|name| name.to_string())
+        .collect();
+    let rows = stmt
+        .query_map([], |row| {
+            let mut object = serde_json::Map::new();
+            for (idx, name) in column_names.iter().enumerate() {
+                let value = row.get_ref(idx)?;
+                object.insert(name.clone(), sqlite_value_to_json(value));
+            }
+            Ok(serde_json::Value::Object(object))
+        })
+        .map_err(|e| format!("sqlite query failed: {}", e))?;
+
+    let mut values = Vec::new();
+    for row in rows {
+        values.push(row.map_err(|e| format!("sqlite row read failed: {}", e))?);
+    }
+    serde_json::to_string(&values).map_err(|e| format!("sqlite json encode failed: {}", e))
+}
+
+fn sqlite_immutable_uri(expanded_path: &str) -> String {
+    let encoded = expanded_path
+        .replace('%', "%25")
+        .replace('\\', "/")
+        .replace(' ', "%20")
+        .replace('#', "%23")
+        .replace('?', "%3F");
+    format!("file:{}?immutable=1", encoded)
+}
+
+fn sqlite_query_json(db_path: &str, sql: &str) -> Result<String, String> {
+    reject_sqlite_dot_commands(sql)?;
+    let expanded = expand_path(db_path);
+    let readonly = rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY;
+    match sqlite_query_json_with_flags(&expanded, sql, readonly) {
+        Ok(value) => Ok(value),
+        Err(primary_error) => {
+            let uri = sqlite_immutable_uri(&expanded);
+            let fallback_flags =
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI;
+            sqlite_query_json_with_flags(&uri, sql, fallback_flags).map_err(|fallback_error| {
+                format!(
+                    "sqlite error: {} (fallback: {})",
+                    primary_error, fallback_error
+                )
+            })
+        }
+    }
+}
+
+fn sqlite_exec(db_path: &str, sql: &str) -> Result<(), String> {
+    reject_sqlite_dot_commands(sql)?;
+    let expanded = expand_path(db_path);
+    let conn =
+        rusqlite::Connection::open(&expanded).map_err(|e| format!("sqlite open failed: {}", e))?;
+    conn.execute_batch(sql)
+        .map_err(|e| format!("sqlite exec failed: {}", e))
 }
 
 fn iso_now() -> String {
@@ -2715,10 +2744,7 @@ mod tests {
             "AI Usage/Claude Code-credentials"
         );
         assert_eq!(
-            windows_credential_target_name(
-                "Claude Code-credentials",
-                Some("ai-usage-test-user")
-            ),
+            windows_credential_target_name("Claude Code-credentials", Some("ai-usage-test-user")),
             "AI Usage/Claude Code-credentials/ai-usage-test-user"
         );
     }
@@ -2775,6 +2801,36 @@ mod tests {
             expand_path(r"$env:AI_USAGE_TEST_HOME\.claude"),
             r"C:\AIUsageTest\.claude"
         );
+    }
+
+    #[test]
+    fn sqlite_api_queries_json_without_external_cli() {
+        let db_path =
+            std::env::temp_dir().join(format!("ai-usage-sqlite-test-{}.db", uuid::Uuid::new_v4()));
+        let db = db_path.to_string_lossy().to_string();
+
+        sqlite_exec(
+            &db,
+            "CREATE TABLE ItemTable (key TEXT PRIMARY KEY, value TEXT);
+             INSERT INTO ItemTable (key, value) VALUES ('cursorAuth/accessToken', 'token-value');",
+        )
+        .expect("sqlite exec");
+
+        let json = sqlite_query_json(
+            &db,
+            "SELECT value FROM ItemTable WHERE key = 'cursorAuth/accessToken' LIMIT 1;",
+        )
+        .expect("sqlite query");
+        let rows: serde_json::Value = serde_json::from_str(&json).expect("json rows");
+        assert_eq!(rows[0]["value"], "token-value");
+
+        let _ = std::fs::remove_file(db_path);
+    }
+
+    #[test]
+    fn sqlite_api_rejects_dot_commands() {
+        let err = sqlite_query_json("unused.db", ".schema").expect_err("dot command rejected");
+        assert!(err.contains("dot-commands"));
     }
 
     #[test]
@@ -3240,11 +3296,8 @@ mod tests {
             std::path::PathBuf::from("/usr/bin"),
             std::path::PathBuf::from("/bin"),
         ];
-        let existing = std::env::join_paths([
-            existing_paths[0].clone(),
-            existing_paths[1].clone(),
-        ])
-        .expect("join existing path");
+        let existing = std::env::join_paths([existing_paths[0].clone(), existing_paths[1].clone()])
+            .expect("join existing path");
 
         let entries = ccusage_path_entries_with(Some(home.as_path()), Some(existing.as_os_str()));
         #[cfg(target_os = "windows")]
@@ -3312,14 +3365,14 @@ mod tests {
 
         #[cfg(not(target_os = "windows"))]
         {
-        let enriched = ccusage_enriched_path_with(None, None).expect("enriched path");
-        let entries: Vec<std::path::PathBuf> =
-            std::env::split_paths(enriched.as_os_str()).collect();
-        let expected = vec![
-            std::path::PathBuf::from("/opt/homebrew/bin"),
-            std::path::PathBuf::from("/usr/local/bin"),
-        ];
-        assert_eq!(entries, expected);
+            let enriched = ccusage_enriched_path_with(None, None).expect("enriched path");
+            let entries: Vec<std::path::PathBuf> =
+                std::env::split_paths(enriched.as_os_str()).collect();
+            let expected = vec![
+                std::path::PathBuf::from("/opt/homebrew/bin"),
+                std::path::PathBuf::from("/usr/local/bin"),
+            ];
+            assert_eq!(entries, expected);
         }
     }
 
@@ -3339,11 +3392,8 @@ mod tests {
             std::path::PathBuf::from("/usr/bin"),
             std::path::PathBuf::from("/bin"),
         ];
-        let existing = std::env::join_paths([
-            existing_paths[0].clone(),
-            existing_paths[1].clone(),
-        ])
-        .expect("join existing path");
+        let existing = std::env::join_paths([existing_paths[0].clone(), existing_paths[1].clone()])
+            .expect("join existing path");
 
         let enriched = ccusage_enriched_path_with(Some(home.as_path()), Some(existing.as_os_str()))
             .expect("path");
@@ -3379,9 +3429,17 @@ mod tests {
     fn ccusage_runner_candidates_include_platform_specific_names() {
         let npm_candidates = ccusage_runner_candidates(CcusageRunnerKind::NpmExec);
         #[cfg(target_os = "windows")]
-        assert!(npm_candidates.iter().any(|candidate| candidate == "npm.cmd"));
+        assert!(
+            npm_candidates
+                .iter()
+                .any(|candidate| candidate == "npm.cmd")
+        );
         #[cfg(not(target_os = "windows"))]
-        assert!(npm_candidates.iter().any(|candidate| candidate == "/usr/local/bin/npm"));
+        assert!(
+            npm_candidates
+                .iter()
+                .any(|candidate| candidate == "/usr/local/bin/npm")
+        );
     }
 
     #[test]

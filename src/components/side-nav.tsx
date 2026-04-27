@@ -216,7 +216,7 @@ export function SideNav({
         aria-label="Home"
       >
         <img
-          src="/icon.png"
+          src="/home.png"
           alt=""
           aria-hidden="true"
           className="size-6 rounded-[5px] object-contain"

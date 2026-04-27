@@ -30,6 +30,7 @@ tmpcov-gem
 !.env.example
 
 # Agent working files
+.worktrees/
 docs/choices.md
 docs/breadcrumbs.md
 docs/superpowers/

@@ -52,6 +52,7 @@ AI Usage는 Windows 시스템 트레이에서만 동작하며 작업표시줄에
 - [Local HTTP API](docs/local-http-api.md)
 - [Proxy support](docs/proxy.md)
 - [Capture logs](docs/capture-logs.md)
+- [개인정보 처리방침](PRIVACY.md)
 
 ### 소스에서 빌드
 
@@ -162,6 +163,7 @@ Providers that can be detected and queried successfully appear automatically. Cu
 - [Local HTTP API](docs/local-http-api.md)
 - [Proxy support](docs/proxy.md)
 - [Capture logs](docs/capture-logs.md)
+- [Privacy Policy](PRIVACY.md)
 
 ### Build From Source
 

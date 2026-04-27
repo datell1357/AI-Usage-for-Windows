@@ -83,7 +83,7 @@ fn current_windows_credential_account_from_user_env(user_env: Option<String>) ->
             }
         })
         .or_else(|| read_env_value_via_command("whoami", &[]))
-        .unwrap_or_else(|| "openusage-user".to_string())
+        .unwrap_or_else(|| "ai-usage-user".to_string())
 }
 
 fn current_windows_credential_account() -> String {
@@ -92,8 +92,8 @@ fn current_windows_credential_account() -> String {
 
 fn windows_credential_target_name(service: &str, account: Option<&str>) -> String {
     match account.map(str::trim).filter(|value| !value.is_empty()) {
-        Some(account) => format!("OpenUsage/{}/{}", service, account),
-        None => format!("OpenUsage/{}", service),
+        Some(account) => format!("AI Usage/{}/{}", service, account),
+        None => format!("AI Usage/{}", service),
     }
 }
 
@@ -598,7 +598,7 @@ pub fn inject_host_api<'js>(
     inject_ccusage(ctx, &host, plugin_id)?;
 
     probe_ctx.set("host", host)?;
-    globals.set("__openusage_ctx", probe_ctx)?;
+    globals.set("__ai_usage_ctx", probe_ctx)?;
 
     Ok(())
 }
@@ -878,8 +878,8 @@ fn inject_http<'js>(ctx: &Ctx<'js>, host: &Object<'js>, plugin_id: &str) -> rqui
     ctx.eval::<(), _>(
         r#"
         (function() {
-            // Will be patched after __openusage_ctx is set.
-            if (typeof __openusage_ctx !== "undefined") {
+            // Will be patched after __ai_usage_ctx is set.
+            if (typeof __ai_usage_ctx !== "undefined") {
                 void 0;
             }
         })();
@@ -896,8 +896,8 @@ pub fn patch_http_wrapper(ctx: &rquickjs::Ctx<'_>) -> rquickjs::Result<()> {
     ctx.eval::<(), _>(
         r#"
         (function() {
-            var rawFn = __openusage_ctx.host.http._requestRaw;
-            __openusage_ctx.host.http.request = function(req) {
+            var rawFn = __ai_usage_ctx.host.http._requestRaw;
+            __ai_usage_ctx.host.http.request = function(req) {
                 var json = JSON.stringify({
                     url: req.url,
                     method: req.method || "GET",
@@ -915,12 +915,12 @@ pub fn patch_http_wrapper(ctx: &rquickjs::Ctx<'_>) -> rquickjs::Result<()> {
     )
 }
 
-/// Inject utility APIs (line builders, formatters, base64, jwt) onto __openusage_ctx
+/// Inject utility APIs (line builders, formatters, base64, jwt) onto __ai_usage_ctx
 pub fn inject_utils(ctx: &rquickjs::Ctx<'_>) -> rquickjs::Result<()> {
     ctx.eval::<(), _>(
         r#"
         (function() {
-            var ctx = __openusage_ctx;
+            var ctx = __ai_usage_ctx;
 
             // Line builders (options object API)
             ctx.line = {
@@ -1443,8 +1443,8 @@ pub fn patch_ls_wrapper(ctx: &rquickjs::Ctx<'_>) -> rquickjs::Result<()> {
     ctx.eval::<(), _>(
         r#"
         (function() {
-            var rawFn = __openusage_ctx.host.ls._discoverRaw;
-            __openusage_ctx.host.ls.discover = function(opts) {
+            var rawFn = __ai_usage_ctx.host.ls._discoverRaw;
+            __ai_usage_ctx.host.ls.discover = function(opts) {
                 var optsJson;
                 try { optsJson = JSON.stringify(opts); } catch (e) { return null; }
                 var json = rawFn(optsJson);
@@ -2100,8 +2100,8 @@ pub fn patch_ccusage_wrapper(ctx: &rquickjs::Ctx<'_>) -> rquickjs::Result<()> {
     ctx.eval::<(), _>(
         r#"
         (function() {
-            var rawFn = __openusage_ctx.host.ccusage._queryRaw;
-            __openusage_ctx.host.ccusage.query = function(opts) {
+            var rawFn = __ai_usage_ctx.host.ccusage._queryRaw;
+            __ai_usage_ctx.host.ccusage.query = function(opts) {
                 var result = rawFn(JSON.stringify(opts || {}));
                 try {
                     var parsed = JSON.parse(result);
@@ -2530,7 +2530,7 @@ mod tests {
             let app_data = std::env::temp_dir();
             inject_host_api(&ctx, "test", &app_data, "0.0.0").expect("inject host api");
             let globals = ctx.globals();
-            let probe_ctx: Object = globals.get("__openusage_ctx").expect("probe ctx");
+            let probe_ctx: Object = globals.get("__ai_usage_ctx").expect("probe ctx");
             let host: Object = probe_ctx.get("host").expect("host");
             let crypto: Object = host.get("crypto").expect("crypto");
             let _decrypt: Function = crypto.get("decryptAes256Gcm").expect("decryptAes256Gcm");
@@ -2547,7 +2547,7 @@ mod tests {
             let app_data = std::env::temp_dir();
             inject_host_api(&ctx, "test", &app_data, "0.0.0").expect("inject host api");
             let js_expr = format!(
-                r#"__openusage_ctx.host.crypto.decryptAes256Gcm("{}", "{}")"#,
+                r#"__ai_usage_ctx.host.crypto.decryptAes256Gcm("{}", "{}")"#,
                 envelope, key_b64
             );
             let decrypted: String = ctx.eval(js_expr).expect("js decrypt");
@@ -2563,7 +2563,7 @@ mod tests {
             let app_data = std::env::temp_dir();
             inject_host_api(&ctx, "test", &app_data, "0.0.0").expect("inject host api");
             let globals = ctx.globals();
-            let probe_ctx: Object = globals.get("__openusage_ctx").expect("probe ctx");
+            let probe_ctx: Object = globals.get("__ai_usage_ctx").expect("probe ctx");
             let host: Object = probe_ctx.get("host").expect("host");
             let keychain: Object = host.get("keychain").expect("keychain");
             let _read: Function = keychain
@@ -2607,7 +2607,7 @@ mod tests {
             let app_data = std::env::temp_dir();
             inject_host_api(&ctx, "test", &app_data, "0.0.0").expect("inject host api");
             let globals = ctx.globals();
-            let probe_ctx: Object = globals.get("__openusage_ctx").expect("probe ctx");
+            let probe_ctx: Object = globals.get("__ai_usage_ctx").expect("probe ctx");
             let host: Object = probe_ctx.get("host").expect("host");
             let env: Object = host.get("env").expect("env");
             let get: Function = env.get("get").expect("get");
@@ -2618,7 +2618,7 @@ mod tests {
                     get.call((name.to_string(),)).expect("get whitelisted var");
                 assert_eq!(value, expected, "{name} should match host env resolver");
 
-                let js_expr = format!(r#"__openusage_ctx.host.env.get("{}")"#, name);
+                let js_expr = format!(r#"__ai_usage_ctx.host.env.get("{}")"#, name);
                 let js_value: Option<String> = ctx.eval(js_expr).expect("js get whitelisted var");
                 assert_eq!(
                     js_value, expected,
@@ -2627,7 +2627,7 @@ mod tests {
             }
 
             let blocked: Option<String> = get
-                .call(("__OPENUSAGE_TEST_NOT_WHITELISTED__".to_string(),))
+                .call(("__AI_USAGE_TEST_NOT_WHITELISTED__".to_string(),))
                 .expect("get blocked var");
             assert!(
                 blocked.is_none(),
@@ -2635,7 +2635,7 @@ mod tests {
             );
 
             let js_blocked: Option<String> = ctx
-                .eval(r#"__openusage_ctx.host.env.get("__OPENUSAGE_TEST_NOT_WHITELISTED__")"#)
+                .eval(r#"__ai_usage_ctx.host.env.get("__AI_USAGE_TEST_NOT_WHITELISTED__")"#)
                 .expect("js get blocked var");
             assert!(
                 js_blocked.is_none(),
@@ -2675,7 +2675,7 @@ mod tests {
             let app_data = std::env::temp_dir();
             inject_host_api(&ctx, "test", &app_data, "0.0.0").expect("inject host api");
             let globals = ctx.globals();
-            let probe_ctx: Object = globals.get("__openusage_ctx").expect("probe ctx");
+            let probe_ctx: Object = globals.get("__ai_usage_ctx").expect("probe ctx");
             let host: Object = probe_ctx.get("host").expect("host");
             let env: Object = host.get("env").expect("env");
             let get: Function = env.get("get").expect("get");
@@ -2688,7 +2688,7 @@ mod tests {
             );
 
             let js_value: Option<String> = ctx
-                .eval(r#"__openusage_ctx.host.env.get("ZAI_API_KEY")"#)
+                .eval(r#"__ai_usage_ctx.host.env.get("ZAI_API_KEY")"#)
                 .expect("js get");
             assert_eq!(
                 js_value.as_deref(),
@@ -2702,24 +2702,24 @@ mod tests {
     fn current_windows_credential_account_prefers_explicit_user_value() {
         assert_eq!(
             current_windows_credential_account_from_user_env(Some(
-                "openusage-test-user".to_string()
+                "ai-usage-test-user".to_string()
             )),
-            "openusage-test-user"
+            "ai-usage-test-user"
         );
     }
 
     #[test]
-    fn windows_credential_target_names_are_scoped_by_openusage_and_account() {
+    fn windows_credential_target_names_are_scoped_by_ai_usage_and_account() {
         assert_eq!(
             windows_credential_target_name("Claude Code-credentials", None),
-            "OpenUsage/Claude Code-credentials"
+            "AI Usage/Claude Code-credentials"
         );
         assert_eq!(
             windows_credential_target_name(
                 "Claude Code-credentials",
-                Some("openusage-test-user")
+                Some("ai-usage-test-user")
             ),
-            "OpenUsage/Claude Code-credentials/openusage-test-user"
+            "AI Usage/Claude Code-credentials/ai-usage-test-user"
         );
     }
 
@@ -2759,21 +2759,21 @@ mod tests {
             }
         }
 
-        let old = std::env::var("OPENUSAGE_TEST_HOME").ok();
+        let old = std::env::var("AI_USAGE_TEST_HOME").ok();
         let _restore = RestoreEnvVar {
-            name: "OPENUSAGE_TEST_HOME",
+            name: "AI_USAGE_TEST_HOME",
             old,
         };
         // SAFETY: this test restores the previous value in `Drop`.
-        unsafe { std::env::set_var("OPENUSAGE_TEST_HOME", r"C:\OpenUsageTest") };
+        unsafe { std::env::set_var("AI_USAGE_TEST_HOME", r"C:\AIUsageTest") };
 
         assert_eq!(
-            expand_path(r"%OPENUSAGE_TEST_HOME%\.codex"),
-            r"C:\OpenUsageTest\.codex"
+            expand_path(r"%AI_USAGE_TEST_HOME%\.codex"),
+            r"C:\AIUsageTest\.codex"
         );
         assert_eq!(
-            expand_path(r"$env:OPENUSAGE_TEST_HOME\.claude"),
-            r"C:\OpenUsageTest\.claude"
+            expand_path(r"$env:AI_USAGE_TEST_HOME\.claude"),
+            r"C:\AIUsageTest\.claude"
         );
     }
 
@@ -3007,10 +3007,10 @@ mod tests {
     #[test]
     fn redact_body_redacts_login_and_analytics_tracking_id() {
         let body =
-            r#"{"login":"robinebers","analytics_tracking_id":"c9df3f012bb8c2eb7aae6868ee8da6cf"}"#;
+            r#"{"login":"sampleuser","analytics_tracking_id":"c9df3f012bb8c2eb7aae6868ee8da6cf"}"#;
         let redacted = redact_body(body);
         assert!(
-            !redacted.contains("robinebers"),
+            !redacted.contains("sampleuser"),
             "login should be redacted, got: {}",
             redacted
         );
@@ -3227,9 +3227,9 @@ mod tests {
     #[test]
     fn ccusage_path_entries_with_home_and_existing_path_preserves_order() {
         #[cfg(target_os = "windows")]
-        let home = std::path::PathBuf::from(r"C:\openusage-home");
+        let home = std::path::PathBuf::from(r"C:\ai-usage-home");
         #[cfg(not(target_os = "windows"))]
-        let home = std::path::PathBuf::from("/tmp/openusage-home");
+        let home = std::path::PathBuf::from("/tmp/ai-usage-home");
         #[cfg(target_os = "windows")]
         let existing_paths = [
             std::path::PathBuf::from(r"C:\Windows\System32"),
@@ -3326,9 +3326,9 @@ mod tests {
     #[test]
     fn ccusage_enriched_path_with_preserves_entries_after_join_and_split() {
         #[cfg(target_os = "windows")]
-        let home = std::path::PathBuf::from(r"C:\openusage-home");
+        let home = std::path::PathBuf::from(r"C:\ai-usage-home");
         #[cfg(not(target_os = "windows"))]
-        let home = std::path::PathBuf::from("/tmp/openusage-home");
+        let home = std::path::PathBuf::from("/tmp/ai-usage-home");
         #[cfg(target_os = "windows")]
         let existing_paths = [
             std::path::PathBuf::from(r"C:\Windows\System32"),

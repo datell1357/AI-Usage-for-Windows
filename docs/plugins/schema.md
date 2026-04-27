@@ -72,7 +72,7 @@ Validation rules:
 
 - `entry` must be relative (not absolute)
 - `entry` must exist within the plugin directory
-- `id` must match `globalThis.__openusage_plugin.id`
+- `id` must match `globalThis.__ai_usage_plugin.id`
 - `icon` must be relative and point to an SVG file (use `fill="currentColor"` for theme compatibility)
 - `links[].url` (if provided) must be an `http://` or `https://` URL
 
@@ -128,7 +128,7 @@ Example:
 Plugins must register themselves on the global object:
 
 ```javascript
-globalThis.__openusage_plugin = {
+globalThis.__ai_usage_plugin = {
   id: "my-provider",  // Must match manifest.id
   probe: function(ctx) { ... }
 }
@@ -247,7 +247,7 @@ A complete, working plugin that fetches data and displays all three line types.
 
 ```javascript
 (function () {
-  globalThis.__openusage_plugin = {
+  globalThis.__ai_usage_plugin = {
     id: "minimal",
     probe: function (ctx) {
       let resp

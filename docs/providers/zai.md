@@ -21,8 +21,8 @@ Tracks [Z.ai](https://z.ai) (Zhipu AI) usage quotas for GLM coding plans.
    the [Z.ai console](https://z.ai/manage-apikey/apikey-list)
 2. Set `ZAI_API_KEY` (fallback: `GLM_API_KEY`)
 
-OpenUsage is a GUI app. A one-off `export ...` in a terminal session will not be visible when you launch OpenUsage from
-Spotlight/Launchpad. Persist it, then restart OpenUsage.
+AI Usage is a GUI app. A one-off `export ...` in a terminal session will not be visible when you launch AI Usage from
+Spotlight/Launchpad. Persist it, then restart AI Usage.
 
 zsh (`~/.zshrc`):
 
@@ -36,7 +36,7 @@ fish (universal var):
 set -Ux ZAI_API_KEY "YOUR_API_KEY"
 ```
 
-3. Enable the Z.ai plugin in OpenUsage settings
+3. Enable the Z.ai plugin in AI Usage settings
 
 ## Endpoints
 

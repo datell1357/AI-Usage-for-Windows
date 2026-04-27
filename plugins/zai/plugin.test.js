@@ -3,7 +3,7 @@ import { makeCtx } from "../test-helpers.js"
 
 const loadPlugin = async () => {
   await import("./plugin.js")
-  return globalThis.__openusage_plugin
+  return globalThis.__ai_usage_plugin
 }
 
 const mockEnvWithKey = (ctx, key, varName = "ZAI_API_KEY") => {
@@ -113,7 +113,7 @@ const mockHttp = (ctx) => {
 
 describe("zai plugin", () => {
   beforeEach(() => {
-    delete globalThis.__openusage_plugin
+    delete globalThis.__ai_usage_plugin
     vi.resetModules()
   })
 

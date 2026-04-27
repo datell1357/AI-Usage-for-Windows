@@ -1,8 +1,8 @@
-# OpenUsage Windows 우선 지원 Implementation Plan
+# AI Usage Windows 우선 지원 Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** OpenUsage를 Windows tray 앱으로 빌드하고, 1차 범위에서 Claude와 Codex 사용량만 안정적으로 표시한다.
+**Goal:** AI Usage를 Windows tray 앱으로 빌드하고, 1차 범위에서 Claude와 Codex 사용량만 안정적으로 표시한다.
 
 **Architecture:** 기존 Tauri 2 + React + Rust + QuickJS plugin 구조를 유지한다. macOS 전용 패널, credential, env/path, ccusage 경계를 OS별 모듈로 나누고, Windows 구현을 추가한다. 기존 provider 파일은 삭제하지 않고 Windows 빌드/기본 활성화 범위만 Claude와 Codex로 제한한다.
 
@@ -583,7 +583,7 @@ pub fn current_user_name() -> String {
             let trimmed = value.trim().to_string();
             if trimmed.is_empty() { None } else { Some(trimmed) }
         })
-        .unwrap_or_else(|| "openusage-user".to_string())
+        .unwrap_or_else(|| "ai-usage-user".to_string())
 }
 
 #[cfg(target_os = "macos")]
@@ -646,7 +646,7 @@ pub fn write_generic_password(service: &str, value: &str) -> Result<(), String> 
     use windows::Win32::Security::Credentials::{CredWriteW, CREDENTIALW, CRED_PERSIST_LOCAL_MACHINE, CRED_TYPE_GENERIC};
 
     let mut target: Vec<u16> = service.encode_utf16().chain(std::iter::once(0)).collect();
-    let mut username: Vec<u16> = "OpenUsage".encode_utf16().chain(std::iter::once(0)).collect();
+    let mut username: Vec<u16> = "AI Usage".encode_utf16().chain(std::iter::once(0)).collect();
     let blob = value.as_bytes();
     let credential = CREDENTIALW {
         Type: CRED_TYPE_GENERIC,
@@ -1336,7 +1336,7 @@ In `docs/capture-logs.md`, add:
 ```md
 ### Windows
 
-Open OpenUsage from the system tray, go to Settings, and use the log path action. Logs are written through the Tauri log plugin under the app log directory.
+Open AI Usage from the system tray, go to Settings, and use the log path action. Logs are written through the Tauri log plugin under the app log directory.
 ```
 
 - [ ] **Step 3: 전체 테스트를 실행한다**

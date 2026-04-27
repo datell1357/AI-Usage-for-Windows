@@ -3,12 +3,12 @@ import { makeCtx } from "../test-helpers.js"
 
 const loadPlugin = async () => {
   await import("./plugin.js")
-  return globalThis.__openusage_plugin
+  return globalThis.__ai_usage_plugin
 }
 
 describe("codex plugin", () => {
   beforeEach(() => {
-    delete globalThis.__openusage_plugin
+    delete globalThis.__ai_usage_plugin
     vi.resetModules()
   })
 
@@ -55,7 +55,7 @@ describe("codex plugin", () => {
 
   it("uses Windows-style CODEX_HOME auth path when env var is set", async () => {
     const ctx = makeCtx()
-    const codexHome = String.raw`C:\Users\openusage\.codex`
+    const codexHome = String.raw`C:\Users\ai-usage\.codex`
     ctx.host.env.get.mockImplementation((name) =>
       name === "CODEX_HOME" ? codexHome : null
     )
@@ -1008,7 +1008,7 @@ describe("codex plugin", () => {
       headers: {},
       bodyText: JSON.stringify({ error: { code: "refresh_token_invalidated" } }),
     })
-    delete globalThis.__openusage_plugin
+    delete globalThis.__ai_usage_plugin
     vi.resetModules()
     plugin = await loadPlugin()
     expect(() => plugin.probe(ctx)).toThrow("Token revoked")
@@ -1033,7 +1033,7 @@ describe("codex plugin", () => {
         }
       })
 
-      delete globalThis.__openusage_plugin
+      delete globalThis.__ai_usage_plugin
       vi.resetModules()
       const plugin = await loadPlugin()
       const result = plugin.probe(ctx)

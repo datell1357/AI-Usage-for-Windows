@@ -3,7 +3,7 @@ import { makeCtx } from "../test-helpers.js"
 
 const loadPlugin = async () => {
   await import("./plugin.js")
-  return globalThis.__openusage_plugin
+  return globalThis.__ai_usage_plugin
 }
 
 function makeJwt(payload) {
@@ -15,7 +15,7 @@ function makeJwt(payload) {
 
 describe("cursor plugin", () => {
   beforeEach(() => {
-    delete globalThis.__openusage_plugin
+    delete globalThis.__ai_usage_plugin
     vi.resetModules()
   })
 

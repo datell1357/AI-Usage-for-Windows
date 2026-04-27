@@ -1,30 +1,20 @@
-# Trademark Policy
+# Branding Notice
 
-## The OpenUsage Brand
+## The AI Usage Brand
 
-The "OpenUsage" name, logo, and associated visual identity are trademarks of Robin Ebers. The MIT license covers the source code, not the brand.
+AI Usage is the Windows-focused name and visual identity used by this repository.
+It is intentionally distinct from the upstream project's name, logo, and visual
+identity.
 
-## What You Can Do
+## Upstream Attribution
 
-- Use "OpenUsage" to refer to this project in articles, blog posts, and discussions
-- Say your project is "compatible with OpenUsage" or "built for OpenUsage"
-- Use the name in community contexts when referring to the official project
+This project is based on MIT-licensed source code from an upstream AI usage
+tracking project. The upstream copyright and MIT license notice remain in
+[LICENSE](LICENSE).
 
-## What You Cannot Do
+## Distribution Rules
 
-- Use "OpenUsage" as the name of a fork or derivative work
-- Use the OpenUsage logo in your own project, product, or service
-- Imply that your project is endorsed by, affiliated with, or an official part of OpenUsage
-- Register domain names or social media accounts using "OpenUsage"
-
-## Forks
-
-If you fork OpenUsage, you must:
-
-1. Choose a different name for your fork
-2. Remove the OpenUsage logo and branding
-3. Clearly state that your project is a fork and not the official OpenUsage
-
-## Questions
-
-If you are unsure whether your use of the OpenUsage brand is allowed, contact [rob@robinebers.com](mailto:rob@robinebers.com).
+- Do not present AI Usage as an official upstream release.
+- Do not reuse upstream-only logos or visual identity in AI Usage builds.
+- Keep the MIT license notice with source and binary distributions.
+- Use the AI Usage name and assets only for this Windows project.

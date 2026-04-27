@@ -106,7 +106,7 @@ function SimpleMarkdown({ content }: { content: string }) {
         return (
           <button
             key={i}
-            onClick={() => openUrl(`https://github.com/robinebers/openusage/pull/${part.content.slice(1)}`).catch(console.error)}
+            onClick={() => openUrl(`https://github.com/datell1357/AI-Usage-for-Windows/pull/${part.content.slice(1)}`).catch(console.error)}
             className={linkClass}
           >
             {part.content}
@@ -128,7 +128,7 @@ function SimpleMarkdown({ content }: { content: string }) {
         return (
           <button
             key={i}
-            onClick={() => openUrl(`https://github.com/robinebers/openusage/commit/${part.content}`).catch(console.error)}
+            onClick={() => openUrl(`https://github.com/datell1357/AI-Usage-for-Windows/commit/${part.content}`).catch(console.error)}
             className={`${linkClass} font-mono`}
           >
             {part.content}
@@ -255,7 +255,7 @@ export function ChangelogDialog({ currentVersion, onBack, onClose }: ChangelogDi
                   <p className="text-[10px] text-muted-foreground text-center">
                     Looking for older versions? Check the{" "}
                     <button 
-                      onClick={() => openUrl("https://github.com/robinebers/openusage/releases").catch(console.error)}
+                      onClick={() => openUrl("https://github.com/datell1357/AI-Usage-for-Windows/releases").catch(console.error)}
                       className="text-[#58a6ff] hover:underline"
                     >
                       full changelog
@@ -269,7 +269,7 @@ export function ChangelogDialog({ currentVersion, onBack, onClose }: ChangelogDi
               <span className="text-sm font-medium mb-1">No specific notes for v{currentVersion}</span>
               <span className="text-xs mb-4">This version might be a pre-release or local build.</span>
               <button 
-                onClick={() => openUrl("https://github.com/robinebers/openusage/releases").catch(console.error)}
+                onClick={() => openUrl("https://github.com/datell1357/AI-Usage-for-Windows/releases").catch(console.error)}
                 className="text-xs text-[#58a6ff] hover:underline"
               >
                 View all releases on GitHub

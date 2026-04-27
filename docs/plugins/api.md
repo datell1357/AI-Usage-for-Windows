@@ -155,7 +155,7 @@ Reads an environment variable by name.
 - Returns `null` when missing
 - Variable must be whitelisted first in `src-tauri/src/plugin_engine/host_api.rs`
 - Resolution order: current process env first, then Windows user/machine environment lookup
-- Values may be cached for the app session; restart OpenUsage after changing shell config
+- Values may be cached for the app session; restart AI Usage after changing shell config
 
 ### Example
 

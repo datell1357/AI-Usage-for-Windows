@@ -6,7 +6,7 @@ const AUTH_PATH = "~/.local/share/opencode/auth.json";
 
 const loadPlugin = async () => {
   await import("./plugin.js");
-  return globalThis.__openusage_plugin;
+  return globalThis.__ai_usage_plugin;
 };
 
 function setAuth(ctx, value = "go-key") {
@@ -59,7 +59,7 @@ function setHistoryQuery(ctx, rows, options = {}) {
 
 describe("opencode-go plugin", () => {
   beforeEach(() => {
-    delete globalThis.__openusage_plugin;
+    delete globalThis.__ai_usage_plugin;
     vi.resetModules();
   });
 

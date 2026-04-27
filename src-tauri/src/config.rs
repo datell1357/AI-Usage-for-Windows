@@ -3,7 +3,7 @@ use serde::Deserialize;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
-/// Proxy configuration loaded from ~/.openusage/config.json
+/// Proxy configuration loaded from ~/.ai-usage/config.json
 #[derive(Debug, Clone, Deserialize)]
 pub struct ProxyConfig {
     pub enabled: bool,
@@ -32,9 +32,9 @@ pub fn get_resolved_proxy() -> Option<&'static ResolvedProxy> {
     RESOLVED_PROXY.get_or_init(|| load_and_resolve_proxy()).as_ref()
 }
 
-/// Config file path: ~/.openusage/config.json
+/// Config file path: ~/.ai-usage/config.json
 fn config_path() -> Option<PathBuf> {
-    dirs::home_dir().map(|home| home.join(".openusage").join("config.json"))
+    dirs::home_dir().map(|home| home.join(".ai-usage").join("config.json"))
 }
 
 /// Loads config from disk, resolves proxy, logs result.

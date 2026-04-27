@@ -5,7 +5,7 @@ let plugin = null
 
 beforeAll(async () => {
   await import("./plugin.js")
-  plugin = globalThis.__openusage_plugin
+  plugin = globalThis.__ai_usage_plugin
 })
 
 beforeEach(() => {
@@ -211,7 +211,7 @@ describe("claude plugin", () => {
 
   it("reads credentials from Windows-style CLAUDE_CONFIG_DIR", async () => {
     const ctx = makeCtx()
-    const configDir = String.raw`C:\Users\openusage\.claude`
+    const configDir = String.raw`C:\Users\ai-usage\.claude`
     const configCredFile = configDir + "/.credentials.json"
     const credsJson = JSON.stringify({
       claudeAiOauth: { accessToken: "windows-file-token", subscriptionType: "pro" },

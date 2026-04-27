@@ -1,12 +1,12 @@
-# OpenUsage Windows First Design
+# AI Usage Windows First Design
 
 ## Summary
 
-Build a Windows version of OpenUsage that initially supports Claude and Codex only. The first version should preserve the existing Tauri, React, Rust, and plugin architecture, while replacing macOS-only integration points with Windows implementations. Existing provider/plugin files should not be deleted. Unsupported providers can remain in the repository and be disabled or excluded from the first Windows bundle.
+Build a Windows version of AI Usage that initially supports Claude and Codex only. The first version should preserve the existing Tauri, React, Rust, and plugin architecture, while replacing macOS-only integration points with Windows implementations. Existing provider/plugin files should not be deleted. Unsupported providers can remain in the repository and be disabled or excluded from the first Windows bundle.
 
 ## Goals
 
-- Run OpenUsage as a Windows desktop tray app.
+- Run AI Usage as a Windows desktop tray app.
 - Show Claude and Codex usage in the existing panel UI.
 - Keep the current plugin runtime and provider output schema.
 - Preserve the local HTTP API at `127.0.0.1:6736`.
@@ -18,12 +18,12 @@ Build a Windows version of OpenUsage that initially supports Claude and Codex on
 - Do not make every existing provider work on Windows in the first version.
 - Do not redesign the UI.
 - Do not replace Tauri or the plugin engine.
-- Do not require users to manually copy credentials into OpenUsage.
+- Do not require users to manually copy credentials into AI Usage.
 - Do not implement a new plugin marketplace or external plugin loading system.
 
 ## Current Architecture
 
-OpenUsage is a Tauri 2 desktop app. The frontend is React with Zustand stores and Tauri IPC calls. The backend is Rust and owns plugin discovery, plugin execution, tray integration, local HTTP API, logging, global shortcuts, autostart, and updater setup.
+AI Usage is a Tauri 2 desktop app. The frontend is React with Zustand stores and Tauri IPC calls. The backend is Rust and owns plugin discovery, plugin execution, tray integration, local HTTP API, logging, global shortcuts, autostart, and updater setup.
 
 At startup, Rust loads bundled plugins from `src-tauri/resources/bundled_plugins`, starts the local HTTP API, creates the tray icon, and exposes Tauri commands. The React app calls `list_plugins` to discover providers, then calls `start_probe_batch` to run provider probes. Each plugin is a JavaScript file executed by QuickJS through `rquickjs`. The host injects APIs for filesystem, environment variables, HTTP, credential access, SQLite, crypto, and ccusage. Probe results are emitted back to the frontend through `probe:result`.
 
@@ -114,7 +114,7 @@ Add a Windows release path without removing the macOS workflow. The Windows rele
 
 ## Data Flow
 
-1. User starts OpenUsage.
+1. User starts AI Usage.
 2. Tauri initializes logging, settings, plugins, local HTTP API, and tray.
 3. React loads plugin metadata and settings.
 4. Enabled plugin IDs are `claude` and `codex`.

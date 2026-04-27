@@ -11,7 +11,7 @@
 - **Auth token file:** `~/.aws/sso/cache/kiro-auth-token.json`
 - **Profile fallback:** `~/Library/Application Support/Kiro/User/globalStorage/kiro.kiroagent/profile.json`
 
-OpenUsage uses Kiro's local normalized usage cache first, enriches it from Kiro's own runtime logs when available, and only falls back to the live refresh/API path when the local picture is missing or stale.
+AI Usage uses Kiro's local normalized usage cache first, enriches it from Kiro's own runtime logs when available, and only falls back to the live refresh/API path when the local picture is missing or stale.
 
 ## Plugin Metrics
 
@@ -78,7 +78,7 @@ Kiro logs the full `GetUsageLimitsCommand` request/response. That response inclu
 - `overageConfiguration.overageStatus`
 - full `usageBreakdownList`
 
-OpenUsage uses the latest logged response to recover plan metadata without needing network access.
+AI Usage uses the latest logged response to recover plan metadata without needing network access.
 
 ## Authentication
 
@@ -159,7 +159,7 @@ Observed response fields:
 - `usageBreakdownList[*]`
 - `userInfo.userId`
 
-## Provider Strategy in OpenUsage
+## Provider Strategy in AI Usage
 
 1. Require Kiro auth token presence so stale post-logout cache data is not shown as an active account.
 2. Read `state.vscdb` for the normalized numeric usage view.

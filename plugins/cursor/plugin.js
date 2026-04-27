@@ -666,5 +666,5 @@
     return { plan: plan, lines: lines }
   }
 
-  globalThis.__openusage_plugin = { id: "cursor", probe }
+  globalThis.__ai_usage_plugin = { id: "cursor", probe }
 })()

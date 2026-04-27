@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "OpenUsage",
+  "productName": "AI Usage",
   "version": "0.6.15",
-  "identifier": "com.sunstory.openusage",
+  "identifier": "com.datell.aiusage",
   "build": {
     "beforeDevCommand": "npm run bundle:plugins && npm run dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "OpenUsage",
+        "title": "AI Usage",
         "width": 400,
         "height": 500,
         "resizable": false,
@@ -48,7 +48,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU2Njk4QTU0MDMzMEY5MTkKUldRWitUQURWSXBwVnFTY1FBWitxNlpaQnB5S3RVWW1qWHJ3NlRuZ2p3c2hPVzNTa3BUR0V0SXkK",
       "endpoints": [
-        "https://github.com/robinebers/openusage/releases/latest/download/latest.json"
+        "https://github.com/datell1357/AI-Usage-for-Windows/releases/latest/download/latest.json"
       ]
     }
   }

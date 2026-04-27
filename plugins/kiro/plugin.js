@@ -213,7 +213,7 @@
     return null
   }
   function buildUserAgent(ctx) {
-    return "OpenUsage/" + String(ctx.app && ctx.app.version ? ctx.app.version : "0.0.0")
+    return "AI Usage/" + String(ctx.app && ctx.app.version ? ctx.app.version : "0.0.0")
   }
   function needsRefresh(ctx, authState, nowMs) {
     return ctx.util.needsRefreshByExpiry({
@@ -379,5 +379,5 @@
     }
     return buildOutput(ctx, snapshot, nowMs)
   }
-  globalThis.__openusage_plugin = { id: "kiro", probe }
+  globalThis.__ai_usage_plugin = { id: "kiro", probe }
 })()

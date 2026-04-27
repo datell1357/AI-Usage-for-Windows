@@ -91,9 +91,9 @@ pub fn run_probe(plugin: &LoadedPlugin, app_data_dir: &PathBuf, app_version: &st
         }
 
         let globals = ctx.globals();
-        let plugin_obj: Object = match globals.get("__openusage_plugin") {
+        let plugin_obj: Object = match globals.get("__ai_usage_plugin") {
             Ok(obj) => obj,
-            Err(_) => return error_output(plugin, "missing __openusage_plugin".to_string()),
+            Err(_) => return error_output(plugin, "missing __ai_usage_plugin".to_string()),
         };
 
         let probe_fn: rquickjs::Function = match plugin_obj.get("probe") {
@@ -102,7 +102,7 @@ pub fn run_probe(plugin: &LoadedPlugin, app_data_dir: &PathBuf, app_version: &st
         };
 
         let probe_ctx: Value = globals
-            .get("__openusage_ctx")
+            .get("__ai_usage_ctx")
             .unwrap_or_else(|_| Value::new_undefined(ctx.clone()));
 
         let result_value: Value = match probe_fn.call((probe_ctx,)) {
@@ -500,7 +500,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_nanos();
-        std::env::temp_dir().join(format!("openusage-test-{}-{}", label, nanos))
+        std::env::temp_dir().join(format!("ai-usage-test-{}-{}", label, nanos))
     }
 
     fn error_text(output: PluginOutput) -> String {
@@ -514,7 +514,7 @@ mod tests {
     fn run_probe_returns_thrown_string_from_sync_error() {
         let plugin = test_plugin(
             r#"
-            globalThis.__openusage_plugin = {
+            globalThis.__ai_usage_plugin = {
                 probe() {
                     throw "boom";
                 }
@@ -529,7 +529,7 @@ mod tests {
     fn run_probe_returns_thrown_string_from_async_error() {
         let plugin = test_plugin(
             r#"
-            globalThis.__openusage_plugin = {
+            globalThis.__ai_usage_plugin = {
                 probe: async function () {
                     throw "boom";
                 }

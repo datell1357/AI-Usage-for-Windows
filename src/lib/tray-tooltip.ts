@@ -15,7 +15,7 @@ export function formatTrayPercentText(fraction: number | undefined): string {
  * Lists the app name followed by enabled plugins and their usage percentages.
  */
 export function formatTrayTooltip(bars: TrayPrimaryBar[], pluginsMeta: PluginMeta[]): string {
-  const lines = ["OpenUsage"]
+  const lines = ["AI Usage"]
   if (bars.length === 0) return lines[0]!
   
   const metaById = new Map(pluginsMeta.map((p) => [p.id, p]))

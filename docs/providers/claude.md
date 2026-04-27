@@ -62,7 +62,7 @@ All windows are enforced simultaneously — hitting any limit throttles the user
 
 ## Supplemental Peak Hours Status
 
-OpenUsage also augments the Claude card with PromoClock peak/off-peak status:
+AI Usage also augments the Claude card with PromoClock peak/off-peak status:
 
 - **Endpoint:** `GET https://promoclock.co/api/status`
 - **Auth:** none

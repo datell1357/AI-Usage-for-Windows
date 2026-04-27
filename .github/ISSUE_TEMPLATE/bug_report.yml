@@ -1,5 +1,5 @@
 name: Bug Report
-description: Report a bug in OpenUsage
+description: Report a bug in AI Usage
 labels: ["bug"]
 body:
   - type: markdown
@@ -20,7 +20,7 @@ body:
       label: Steps to Reproduce
       description: How can we reproduce this?
       placeholder: |
-        1. Open OpenUsage
+        1. Open AI Usage
         2. Go to ...
         3. Click on ...
         4. See error
@@ -43,7 +43,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: OpenUsage Version
+      label: AI Usage Version
       description: Which version are you running? (Check Settings or About)
       placeholder: "e.g. 0.4.2"
     validations:

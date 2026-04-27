@@ -10,7 +10,7 @@ export interface Release {
 }
 
 async function fetchReleaseByTag(tag: string): Promise<Release | null> {
-  const url = `https://api.github.com/repos/robinebers/openusage/releases/tags/${encodeURIComponent(
+  const url = `https://api.github.com/repos/datell1357/AI-Usage-for-Windows/releases/tags/${encodeURIComponent(
     tag,
   )}`
   const res = await fetch(url)

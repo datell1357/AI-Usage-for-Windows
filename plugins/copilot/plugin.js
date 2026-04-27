@@ -1,5 +1,5 @@
 (function () {
-  const KEYCHAIN_SERVICE = "OpenUsage-copilot";
+  const KEYCHAIN_SERVICE = "AI Usage-copilot";
   const GH_KEYCHAIN_SERVICE = "gh:github.com";
   const USAGE_URL = "https://api.github.com/copilot_internal/user";
 
@@ -49,12 +49,12 @@
       if (raw) {
         const parsed = ctx.util.tryParseJson(raw);
         if (parsed && parsed.token) {
-          ctx.host.log.info("token loaded from OpenUsage keychain");
+          ctx.host.log.info("token loaded from AI Usage keychain");
           return { token: parsed.token, source: "keychain" };
         }
       }
     } catch (e) {
-      ctx.host.log.info("OpenUsage keychain read failed: " + String(e));
+      ctx.host.log.info("AI Usage keychain read failed: " + String(e));
     }
     return null;
   }
@@ -196,7 +196,7 @@
       );
     }
 
-    // Persist gh-cli token to OpenUsage keychain for future use
+    // Persist gh-cli token to AI Usage keychain for future use
     if (source === "gh-cli") {
       saveToken(ctx, token);
     }
@@ -260,5 +260,5 @@
     return { plan: plan, lines: lines };
   }
 
-  globalThis.__openusage_plugin = { id: "copilot", probe };
+  globalThis.__ai_usage_plugin = { id: "copilot", probe };
 })();

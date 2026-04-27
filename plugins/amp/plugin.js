@@ -171,5 +171,5 @@
     return { plan: plan, lines: lines }
   }
 
-  globalThis.__openusage_plugin = { id: "amp", probe: probe }
+  globalThis.__ai_usage_plugin = { id: "amp", probe: probe }
 })()

@@ -249,7 +249,7 @@
     const headers = {
       Authorization: "Bearer " + accessToken,
       Accept: "application/json",
-      "User-Agent": "OpenUsage",
+      "User-Agent": "AI Usage",
     }
     if (accountId) {
       headers["ChatGPT-Account-Id"] = accountId
@@ -682,5 +682,5 @@
     throw "Not logged in. Run `codex` to authenticate."
   }
 
-  globalThis.__openusage_plugin = { id: "codex", probe }
+  globalThis.__ai_usage_plugin = { id: "codex", probe }
 })()

@@ -8,7 +8,7 @@ const LOG_PATH =
 
 const loadPlugin = async () => {
   await import("./plugin.js")
-  return globalThis.__openusage_plugin
+  return globalThis.__ai_usage_plugin
 }
 
 const makeToken = (overrides = {}) => ({
@@ -110,7 +110,7 @@ const writeUsageLog = (ctx, output = makeUsageOutput(), loggedAt = "2026-02-01 2
 
 describe("kiro plugin", () => {
   beforeEach(() => {
-    delete globalThis.__openusage_plugin
+    delete globalThis.__ai_usage_plugin
     vi.resetModules()
   })
 

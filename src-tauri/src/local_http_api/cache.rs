@@ -224,7 +224,7 @@ mod tests {
     #[test]
     fn cache_file_round_trip() {
         let dir = std::env::temp_dir().join(format!(
-            "openusage-test-cache-{}",
+            "ai-usage-test-cache-{}",
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
@@ -248,7 +248,7 @@ mod tests {
     #[test]
     fn load_cache_returns_empty_on_missing_file() {
         let dir = std::env::temp_dir().join(format!(
-            "openusage-test-no-cache-{}",
+            "ai-usage-test-no-cache-{}",
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
@@ -261,7 +261,7 @@ mod tests {
     #[test]
     fn load_cache_returns_empty_on_invalid_json() {
         let dir = std::env::temp_dir().join(format!(
-            "openusage-test-bad-cache-{}",
+            "ai-usage-test-bad-cache-{}",
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()

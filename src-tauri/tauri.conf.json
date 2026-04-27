@@ -32,6 +32,9 @@
   "bundle": {
     "active": true,
     "targets": ["nsis", "msi"],
+    "publisher": "Yeoreum",
+    "homepage": "https://github.com/datell1357/AI-Usage-for-Windows",
+    "copyright": "Copyright (c) 2026 Yeoreum",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

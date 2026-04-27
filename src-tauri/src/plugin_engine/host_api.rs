@@ -75,6 +75,31 @@ fn current_macos_keychain_account() -> String {
     current_macos_keychain_account_from_user_env(read_env_from_process("USER"))
 }
 
+fn current_windows_credential_account_from_user_env(user_env: Option<String>) -> String {
+    user_env
+        .and_then(|value| {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        })
+        .or_else(|| read_env_value_via_command("whoami", &[]))
+        .unwrap_or_else(|| "openusage-user".to_string())
+}
+
+fn current_windows_credential_account() -> String {
+    current_windows_credential_account_from_user_env(read_env_from_process("USERNAME"))
+}
+
+fn windows_credential_target_name(service: &str, account: Option<&str>) -> String {
+    match account.map(str::trim).filter(|value| !value.is_empty()) {
+        Some(account) => format!("OpenUsage/{}/{}", service, account),
+        None => format!("OpenUsage/{}", service),
+    }
+}
+
 fn keychain_find_generic_password_args(service: &str) -> Vec<OsString> {
     vec![
         OsString::from("find-generic-password"),
@@ -104,6 +129,211 @@ fn keychain_add_generic_password_args(service: &str, value: &str) -> Vec<OsStrin
         OsString::from("-w"),
         OsString::from(value),
     ]
+}
+
+fn read_keychain_generic_password(service: &str, account: Option<&str>) -> Result<String, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let output = match account {
+            Some(account) => std::process::Command::new("security")
+                .args(keychain_find_generic_password_args_for_account(service, account))
+                .output(),
+            None => std::process::Command::new("security")
+                .args(keychain_find_generic_password_args(service))
+                .output(),
+        }
+        .map_err(|e| format!("keychain read failed: {}", e))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let first_line = stderr.lines().next().unwrap_or("").trim();
+            return Err(format!("keychain item not found: {}", first_line));
+        }
+
+        return Ok(String::from_utf8_lossy(&output.stdout).trim().to_string());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        read_windows_generic_credential(service, account)
+            .map_err(|error| format!("credential read failed: {}", error))
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        let _ = (service, account);
+        Err("keychain API is only supported on macOS and Windows".to_string())
+    }
+}
+
+fn write_keychain_generic_password(
+    service: &str,
+    account: Option<&str>,
+    value: &str,
+) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let output = match account {
+            Some(account) => std::process::Command::new("security")
+                .args(keychain_add_generic_password_args_for_account(
+                    service, account, value,
+                ))
+                .output(),
+            None => {
+                let mut account_arg: Option<String> = None;
+                let find_output = std::process::Command::new("security")
+                    .args(["find-generic-password", "-s", service])
+                    .output();
+
+                if let Ok(output) = find_output {
+                    if output.status.success() {
+                        let stdout = String::from_utf8_lossy(&output.stdout);
+                        for line in stdout.lines() {
+                            if let Some(start) = line.find("\"acct\"<blob>=\"") {
+                                let rest = &line[start + 14..];
+                                if let Some(end) = rest.find('"') {
+                                    account_arg = Some(rest[..end].to_string());
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if let Some(ref acct) = account_arg {
+                    std::process::Command::new("security")
+                        .args(keychain_add_generic_password_args_for_account(
+                            service, acct, value,
+                        ))
+                        .output()
+                } else {
+                    std::process::Command::new("security")
+                        .args(keychain_add_generic_password_args(service, value))
+                        .output()
+                }
+            }
+        }
+        .map_err(|e| format!("keychain write failed: {}", e))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let first_line = stderr.lines().next().unwrap_or("").trim();
+            return Err(format!("keychain write failed: {}", first_line));
+        }
+
+        return Ok(());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        write_windows_generic_credential(service, account, value)
+            .map_err(|error| format!("credential write failed: {}", error))
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        let _ = (service, account, value);
+        Err("keychain API is only supported on macOS and Windows".to_string())
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn windows_wide_null(value: &str) -> Vec<u16> {
+    value.encode_utf16().chain(std::iter::once(0)).collect()
+}
+
+#[cfg(target_os = "windows")]
+fn windows_last_error_message() -> String {
+    let code = unsafe { windows_sys::Win32::Foundation::GetLastError() };
+    std::io::Error::from_raw_os_error(code as i32).to_string()
+}
+
+#[cfg(target_os = "windows")]
+fn read_windows_generic_credential(service: &str, account: Option<&str>) -> Result<String, String> {
+    use windows_sys::Win32::Security::Credentials::{
+        CRED_TYPE_GENERIC, CREDENTIALW, CredFree, CredReadW,
+    };
+
+    let target = windows_credential_target_name(service, account);
+    let target_w = windows_wide_null(&target);
+    let mut credential: *mut CREDENTIALW = std::ptr::null_mut();
+
+    let ok = unsafe {
+        CredReadW(
+            target_w.as_ptr(),
+            CRED_TYPE_GENERIC,
+            0,
+            &mut credential,
+        )
+    };
+
+    if ok == 0 {
+        return Err(windows_last_error_message());
+    }
+
+    if credential.is_null() {
+        return Err("credential pointer was null".to_string());
+    }
+
+    let value = unsafe {
+        let credential_ref = &*credential;
+        let blob = std::slice::from_raw_parts(
+            credential_ref.CredentialBlob,
+            credential_ref.CredentialBlobSize as usize,
+        );
+        let value =
+            String::from_utf8(blob.to_vec()).map_err(|error| {
+                format!("credential blob is not UTF-8: {}", error)
+            });
+        CredFree(credential.cast());
+        value
+    }?;
+
+    Ok(value)
+}
+
+#[cfg(target_os = "windows")]
+fn write_windows_generic_credential(
+    service: &str,
+    account: Option<&str>,
+    value: &str,
+) -> Result<(), String> {
+    use windows_sys::Win32::Security::Credentials::{
+        CRED_PERSIST_LOCAL_MACHINE, CRED_TYPE_GENERIC, CREDENTIALW, CredWriteW,
+    };
+
+    let target = windows_credential_target_name(service, account);
+    let mut target_w = windows_wide_null(&target);
+    let mut account_w = account.map(windows_wide_null);
+    let mut blob = value.as_bytes().to_vec();
+
+    let credential = CREDENTIALW {
+        Flags: 0,
+        Type: CRED_TYPE_GENERIC,
+        TargetName: target_w.as_mut_ptr(),
+        Comment: std::ptr::null_mut(),
+        LastWritten: windows_sys::Win32::Foundation::FILETIME {
+            dwLowDateTime: 0,
+            dwHighDateTime: 0,
+        },
+        CredentialBlobSize: blob.len() as u32,
+        CredentialBlob: blob.as_mut_ptr(),
+        Persist: CRED_PERSIST_LOCAL_MACHINE,
+        AttributeCount: 0,
+        Attributes: std::ptr::null_mut(),
+        TargetAlias: std::ptr::null_mut(),
+        UserName: account_w
+            .as_mut()
+            .map(|value| value.as_mut_ptr())
+            .unwrap_or(std::ptr::null_mut()),
+    };
+
+    let ok = unsafe { CredWriteW(&credential, 0) };
+    if ok == 0 {
+        return Err(windows_last_error_message());
+    }
+
+    Ok(())
 }
 
 fn keychain_add_generic_password_args_for_account(
@@ -2005,44 +2235,26 @@ fn inject_keychain<'js>(
         Function::new(
             ctx.clone(),
             move |ctx_inner: Ctx<'_>, service: String| -> rquickjs::Result<String> {
-                if !cfg!(target_os = "macos") {
-                    return Err(Exception::throw_message(
-                        &ctx_inner,
-                        "keychain API is only supported on macOS",
-                    ));
-                }
                 log::info!("[plugin:{}] keychain read: service={}", pid_read, service);
-                let output = std::process::Command::new("security")
-                    .args(keychain_find_generic_password_args(&service))
-                    .output()
-                    .map_err(|e| {
-                        Exception::throw_message(
-                            &ctx_inner,
-                            &format!("keychain read failed: {}", e),
-                        )
-                    })?;
-
-                if !output.status.success() {
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    let first_line = stderr.lines().next().unwrap_or("").trim();
-                    log::warn!(
-                        "[plugin:{}] keychain read miss: service={}, error={}",
-                        pid_read,
-                        service,
-                        first_line
-                    );
-                    return Err(Exception::throw_message(
-                        &ctx_inner,
-                        &format!("keychain item not found: {}", first_line),
-                    ));
+                match read_keychain_generic_password(&service, None) {
+                    Ok(value) => {
+                        log::info!(
+                            "[plugin:{}] keychain read hit: service={}",
+                            pid_read,
+                            service
+                        );
+                        Ok(value)
+                    }
+                    Err(error) => {
+                        log::warn!(
+                            "[plugin:{}] keychain read miss: service={}, error={}",
+                            pid_read,
+                            service,
+                            error
+                        );
+                        Err(Exception::throw_message(&ctx_inner, &error))
+                    }
                 }
-
-                log::info!(
-                    "[plugin:{}] keychain read hit: service={}",
-                    pid_read,
-                    service
-                );
-                Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
             },
         )?,
     )?;
@@ -2053,14 +2265,10 @@ fn inject_keychain<'js>(
         Function::new(
             ctx.clone(),
             move |ctx_inner: Ctx<'_>, service: String| -> rquickjs::Result<String> {
-                if !cfg!(target_os = "macos") {
-                    return Err(Exception::throw_message(
-                        &ctx_inner,
-                        "keychain API is only supported on macOS",
-                    ));
-                }
+                #[cfg(target_os = "windows")]
+                let account = current_windows_credential_account();
+                #[cfg(not(target_os = "windows"))]
                 let account = current_macos_keychain_account();
-                let args = keychain_find_generic_password_args_for_account(&service, &account);
                 let redacted_account = redact_value(&account);
                 log::info!(
                     "[plugin:{}] keychain read: service={}, account={}",
@@ -2068,39 +2276,27 @@ fn inject_keychain<'js>(
                     service,
                     redacted_account
                 );
-                let output = std::process::Command::new("security")
-                    .args(&args)
-                    .output()
-                    .map_err(|e| {
-                        Exception::throw_message(
-                            &ctx_inner,
-                            &format!("keychain read failed: {}", e),
-                        )
-                    })?;
-
-                if !output.status.success() {
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    let first_line = stderr.lines().next().unwrap_or("").trim();
-                    log::warn!(
-                        "[plugin:{}] keychain read miss: service={}, account={}, error={}",
-                        pid_read_current_user,
-                        service,
-                        redacted_account,
-                        first_line
-                    );
-                    return Err(Exception::throw_message(
-                        &ctx_inner,
-                        &format!("keychain item not found: {}", first_line),
-                    ));
+                match read_keychain_generic_password(&service, Some(&account)) {
+                    Ok(value) => {
+                        log::info!(
+                            "[plugin:{}] keychain read hit: service={}, account={}",
+                            pid_read_current_user,
+                            service,
+                            redacted_account
+                        );
+                        Ok(value)
+                    }
+                    Err(error) => {
+                        log::warn!(
+                            "[plugin:{}] keychain read miss: service={}, account={}, error={}",
+                            pid_read_current_user,
+                            service,
+                            redacted_account,
+                            error
+                        );
+                        Err(Exception::throw_message(&ctx_inner, &error))
+                    }
                 }
-
-                log::info!(
-                    "[plugin:{}] keychain read hit: service={}, account={}",
-                    pid_read_current_user,
-                    service,
-                    redacted_account
-                );
-                Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
             },
         )?,
     )?;
@@ -2111,62 +2307,16 @@ fn inject_keychain<'js>(
         Function::new(
             ctx.clone(),
             move |ctx_inner: Ctx<'_>, service: String, value: String| -> rquickjs::Result<()> {
-                if !cfg!(target_os = "macos") {
-                    return Err(Exception::throw_message(
-                        &ctx_inner,
-                        "keychain API is only supported on macOS",
-                    ));
-                }
                 log::info!("[plugin:{}] keychain write: service={}", pid_write, service);
 
-                let mut account_arg: Option<String> = None;
-                let find_output = std::process::Command::new("security")
-                    .args(["find-generic-password", "-s", &service])
-                    .output();
-
-                if let Ok(output) = find_output {
-                    if output.status.success() {
-                        let stdout = String::from_utf8_lossy(&output.stdout);
-                        for line in stdout.lines() {
-                            if let Some(start) = line.find("\"acct\"<blob>=\"") {
-                                let rest = &line[start + 14..];
-                                if let Some(end) = rest.find('"') {
-                                    account_arg = Some(rest[..end].to_string());
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                let output = if let Some(ref acct) = account_arg {
-                    std::process::Command::new("security")
-                        .args(keychain_add_generic_password_args_for_account(
-                            &service, acct, &value,
-                        ))
-                        .output()
-                } else {
-                    std::process::Command::new("security")
-                        .args(keychain_add_generic_password_args(&service, &value))
-                        .output()
-                }
-                .map_err(|e| {
-                    Exception::throw_message(&ctx_inner, &format!("keychain write failed: {}", e))
-                })?;
-
-                if !output.status.success() {
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    let first_line = stderr.lines().next().unwrap_or("").trim();
+                if let Err(error) = write_keychain_generic_password(&service, None, &value) {
                     log::warn!(
                         "[plugin:{}] keychain write failed: service={}, error={}",
                         pid_write,
                         service,
-                        first_line
+                        error
                     );
-                    return Err(Exception::throw_message(
-                        &ctx_inner,
-                        &format!("keychain write failed: {}", first_line),
-                    ));
+                    return Err(Exception::throw_message(&ctx_inner, &error));
                 }
 
                 log::info!(
@@ -2185,15 +2335,10 @@ fn inject_keychain<'js>(
         Function::new(
             ctx.clone(),
             move |ctx_inner: Ctx<'_>, service: String, value: String| -> rquickjs::Result<()> {
-                if !cfg!(target_os = "macos") {
-                    return Err(Exception::throw_message(
-                        &ctx_inner,
-                        "keychain API is only supported on macOS",
-                    ));
-                }
+                #[cfg(target_os = "windows")]
+                let account = current_windows_credential_account();
+                #[cfg(not(target_os = "windows"))]
                 let account = current_macos_keychain_account();
-                let args =
-                    keychain_add_generic_password_args_for_account(&service, &account, &value);
                 let redacted_account = redact_value(&account);
                 log::info!(
                     "[plugin:{}] keychain write: service={}, account={}",
@@ -2201,30 +2346,17 @@ fn inject_keychain<'js>(
                     service,
                     redacted_account
                 );
-                let output = std::process::Command::new("security")
-                    .args(&args)
-                    .output()
-                    .map_err(|e| {
-                        Exception::throw_message(
-                            &ctx_inner,
-                            &format!("keychain write failed: {}", e),
-                        )
-                    })?;
-
-                if !output.status.success() {
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    let first_line = stderr.lines().next().unwrap_or("").trim();
+                if let Err(error) =
+                    write_keychain_generic_password(&service, Some(&account), &value)
+                {
                     log::warn!(
                         "[plugin:{}] keychain write failed: service={}, account={}, error={}",
                         pid_write_current_user,
                         service,
                         redacted_account,
-                        first_line
+                        error
                     );
-                    return Err(Exception::throw_message(
-                        &ctx_inner,
-                        &format!("keychain write failed: {}", first_line),
-                    ));
+                    return Err(Exception::throw_message(&ctx_inner, &error));
                 }
 
                 log::info!(
@@ -2648,6 +2780,31 @@ mod tests {
         assert_eq!(
             current_macos_keychain_account_from_user_env(Some("openusage-test-user".to_string())),
             "openusage-test-user"
+        );
+    }
+
+    #[test]
+    fn current_windows_credential_account_prefers_explicit_user_value() {
+        assert_eq!(
+            current_windows_credential_account_from_user_env(Some(
+                "openusage-test-user".to_string()
+            )),
+            "openusage-test-user"
+        );
+    }
+
+    #[test]
+    fn windows_credential_target_names_are_scoped_by_openusage_and_account() {
+        assert_eq!(
+            windows_credential_target_name("Claude Code-credentials", None),
+            "OpenUsage/Claude Code-credentials"
+        );
+        assert_eq!(
+            windows_credential_target_name(
+                "Claude Code-credentials",
+                Some("openusage-test-user")
+            ),
+            "OpenUsage/Claude Code-credentials/openusage-test-user"
         );
     }
 

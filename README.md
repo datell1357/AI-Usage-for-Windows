@@ -104,7 +104,9 @@ npm.cmd run tauri -- build
 
 Built by [Yeoreum](https://www.threads.com/@mini.yeoreum).
 
-AI Usage는 MIT 라이선스 소스 코드에 대한 수정 사항을 포함합니다. 필요한 저작권 및 허가 고지는 [LICENSE](LICENSE)에 보존되어 있습니다.
+AI Usage는 [robinebers/openusage](https://github.com/robinebers/openusage)의 MIT 라이선스 소스 코드를 기반으로 Windows용으로 수정한 별도 프로젝트입니다. 이 프로젝트는 원본 프로젝트의 공식 배포판이 아닙니다.
+
+필요한 저작권 및 허가 고지는 [LICENSE](LICENSE)에 보존되어 있습니다.
 
 ### 라이선스
 
@@ -212,7 +214,9 @@ Installers are written to:
 
 Built by [Yeoreum](https://www.threads.com/@mini.yeoreum).
 
-AI Usage includes modifications to MIT-licensed source code. Required copyright and permission notices are preserved in [LICENSE](LICENSE).
+AI Usage is a separate Windows-focused project based on MIT-licensed source code from [robinebers/openusage](https://github.com/robinebers/openusage). It is not an official distribution of the original project.
+
+Required copyright and permission notices are preserved in [LICENSE](LICENSE).
 
 ### License
 

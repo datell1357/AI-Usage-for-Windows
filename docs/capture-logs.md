@@ -4,14 +4,13 @@ Use this when OpenUsage is not working and you need to share debug info.
 
 - Audience: non-technical users
 - Time: ~2 minutes
-- Platform: macOS or Windows
+- Platform: Windows
 
 ## 1) Set log level to Debug
 
 1. Find the OpenUsage icon.
    - On Windows, look in the system tray.
-   - On macOS, look in the menu bar.
-2. Right-click it. On macOS you can also hold `Control` and click.
+2. Right-click it.
 3. Open `Debug Level`.
 4. Select `Debug`.
 
@@ -25,8 +24,6 @@ If OpenUsage does not open at all, skip this step and continue.
 
 ## 3) Open the log folder
 
-### Windows
-
 1. Press `Windows` + `R`.
 2. Paste this path:
 
@@ -36,18 +33,6 @@ If OpenUsage does not open at all, skip this step and continue.
 
 3. Press `Enter`.
 4. If that folder does not exist, open OpenUsage Settings and use the log path shown by the app, or search `%APPDATA%` for `openusage.log`.
-
-### macOS
-
-1. Open Finder.
-2. Press `Shift` + `Command` + `G`.
-3. Paste this path:
-
-```text
-~/Library/Logs/com.sunstory.openusage
-```
-
-4. Press `Enter`.
 
 ## 4) Attach log files to your GitHub issue
 
@@ -63,9 +48,9 @@ Copy/paste and fill:
 What I expected:
 What happened instead:
 When it happened (local time + timezone):
-Which provider was affected (Codex / Claude / Cursor / etc.):
+Which provider was affected (Codex / Claude):
 OpenUsage version:
-Operating system (Windows / macOS):
+Operating system (Windows version):
 ```
 
 ## Privacy note

@@ -53,8 +53,8 @@ body:
     attributes:
       label: Operating System
       options:
-        - macOS (Apple Silicon)
-        - macOS (Intel)
+        - Windows 11
+        - Windows 10
     validations:
       required: true
   - type: textarea

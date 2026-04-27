@@ -91,7 +91,7 @@ This is informational only. PromoClock is an independent public service, not an 
 }
 ```
 
-**Fallback:** macOS Keychain, service name `Claude Code-credentials` (same JSON structure).
+**Fallback:** Windows Credential Manager, service name `Claude Code-credentials` (same JSON structure).
 
 ### Token Refresh
 

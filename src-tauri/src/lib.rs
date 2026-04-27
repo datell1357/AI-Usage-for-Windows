@@ -1,15 +1,9 @@
-#[cfg(target_os = "macos")]
-mod app_nap;
 mod config;
 mod local_http_api;
-#[cfg(target_os = "macos")]
-mod panel;
 #[cfg(target_os = "windows")]
 mod panel_windows;
 mod plugin_engine;
 mod tray;
-#[cfg(target_os = "macos")]
-mod webkit_config;
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -131,8 +125,6 @@ fn handle_global_shortcut(
 ) {
     if event.state == ShortcutState::Pressed {
         log::debug!("Global shortcut triggered");
-        #[cfg(target_os = "macos")]
-        panel::toggle_panel(app);
         #[cfg(target_os = "windows")]
         panel_windows::toggle_panel(app);
     }
@@ -196,23 +188,12 @@ pub struct ProbeBatchComplete {
 
 #[tauri::command]
 fn init_panel(app_handle: tauri::AppHandle) {
-    #[cfg(target_os = "macos")]
-    panel::init(&app_handle).expect("Failed to initialize panel");
-
     #[cfg(target_os = "windows")]
     panel_windows::init(&app_handle).expect("Failed to initialize panel");
 }
 
 #[tauri::command]
 fn hide_panel(app_handle: tauri::AppHandle) {
-    #[cfg(target_os = "macos")]
-    {
-        use tauri_nspanel::ManagerExt;
-        if let Ok(panel) = app_handle.get_webview_panel("main") {
-            panel.hide();
-        }
-    }
-
     #[cfg(target_os = "windows")]
     {
         use tauri::Manager;
@@ -374,17 +355,6 @@ async fn start_probe_batch(
 #[tauri::command]
 fn get_log_path(app_handle: tauri::AppHandle) -> Result<String, String> {
     let log_file = {
-        #[cfg(target_os = "macos")]
-        {
-            // macOS log directory: ~/Library/Logs/{bundleIdentifier}
-            let home = dirs::home_dir().ok_or("no home dir")?;
-            let bundle_id = app_handle.config().identifier.clone();
-            home.join("Library")
-                .join("Logs")
-                .join(&bundle_id)
-                .join(format!("{}.log", app_handle.package_info().name))
-        }
-
         #[cfg(target_os = "windows")]
         {
             use tauri::Manager;
@@ -396,7 +366,7 @@ fn get_log_path(app_handle: tauri::AppHandle) -> Result<String, String> {
                 .join(format!("{}.log", app_handle.package_info().name))
         }
 
-        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        #[cfg(not(target_os = "windows"))]
         {
             return Err("unsupported platform".to_string());
         }
@@ -521,15 +491,10 @@ pub fn run() {
     let runtime = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
     let _guard = runtime.enter();
 
-    let mut builder = tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_aptabase::Builder::new("A-US-6435241436").build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::default().build());
-
-    #[cfg(target_os = "macos")]
-    {
-        builder = builder.plugin(tauri_nspanel::init());
-    }
 
     builder
         .plugin(
@@ -560,15 +525,6 @@ pub fn run() {
             update_global_shortcut
         ])
         .setup(|app| {
-            #[cfg(target_os = "macos")]
-            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-
-            #[cfg(target_os = "macos")]
-            {
-                app_nap::disable_app_nap();
-                webkit_config::disable_webview_suspension(app.handle());
-            }
-
             use tauri::Manager;
 
             let version = app.package_info().version.to_string();

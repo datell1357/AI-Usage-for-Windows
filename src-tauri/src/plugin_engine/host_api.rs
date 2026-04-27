@@ -72,24 +72,6 @@ fn configure_hidden_command_window(command: &mut Command) {
     }
 }
 
-fn current_macos_keychain_account_from_user_env(user_env: Option<String>) -> String {
-    user_env
-        .and_then(|value| {
-            let trimmed = value.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            }
-        })
-        .or_else(|| read_env_value_via_command("id", &["-un"]))
-        .unwrap_or_else(|| "openusage-user".to_string())
-}
-
-fn current_macos_keychain_account() -> String {
-    current_macos_keychain_account_from_user_env(read_env_from_process("USER"))
-}
-
 fn current_windows_credential_account_from_user_env(user_env: Option<String>) -> String {
     user_env
         .and_then(|value| {
@@ -115,69 +97,17 @@ fn windows_credential_target_name(service: &str, account: Option<&str>) -> Strin
     }
 }
 
-fn keychain_find_generic_password_args(service: &str) -> Vec<OsString> {
-    vec![
-        OsString::from("find-generic-password"),
-        OsString::from("-s"),
-        OsString::from(service),
-        OsString::from("-w"),
-    ]
-}
-
-fn keychain_find_generic_password_args_for_account(service: &str, account: &str) -> Vec<OsString> {
-    vec![
-        OsString::from("find-generic-password"),
-        OsString::from("-a"),
-        OsString::from(account),
-        OsString::from("-s"),
-        OsString::from(service),
-        OsString::from("-w"),
-    ]
-}
-
-fn keychain_add_generic_password_args(service: &str, value: &str) -> Vec<OsString> {
-    vec![
-        OsString::from("add-generic-password"),
-        OsString::from("-U"),
-        OsString::from("-s"),
-        OsString::from(service),
-        OsString::from("-w"),
-        OsString::from(value),
-    ]
-}
-
 fn read_keychain_generic_password(service: &str, account: Option<&str>) -> Result<String, String> {
-    #[cfg(target_os = "macos")]
-    {
-        let output = match account {
-            Some(account) => std::process::Command::new("security")
-                .args(keychain_find_generic_password_args_for_account(service, account))
-                .output(),
-            None => std::process::Command::new("security")
-                .args(keychain_find_generic_password_args(service))
-                .output(),
-        }
-        .map_err(|e| format!("keychain read failed: {}", e))?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let first_line = stderr.lines().next().unwrap_or("").trim();
-            return Err(format!("keychain item not found: {}", first_line));
-        }
-
-        return Ok(String::from_utf8_lossy(&output.stdout).trim().to_string());
-    }
-
     #[cfg(target_os = "windows")]
     {
         read_windows_generic_credential(service, account)
             .map_err(|error| format!("credential read failed: {}", error))
     }
 
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    #[cfg(not(target_os = "windows"))]
     {
         let _ = (service, account);
-        Err("keychain API is only supported on macOS and Windows".to_string())
+        Err("keychain API is only supported on Windows".to_string())
     }
 }
 
@@ -186,69 +116,16 @@ fn write_keychain_generic_password(
     account: Option<&str>,
     value: &str,
 ) -> Result<(), String> {
-    #[cfg(target_os = "macos")]
-    {
-        let output = match account {
-            Some(account) => std::process::Command::new("security")
-                .args(keychain_add_generic_password_args_for_account(
-                    service, account, value,
-                ))
-                .output(),
-            None => {
-                let mut account_arg: Option<String> = None;
-                let find_output = std::process::Command::new("security")
-                    .args(["find-generic-password", "-s", service])
-                    .output();
-
-                if let Ok(output) = find_output {
-                    if output.status.success() {
-                        let stdout = String::from_utf8_lossy(&output.stdout);
-                        for line in stdout.lines() {
-                            if let Some(start) = line.find("\"acct\"<blob>=\"") {
-                                let rest = &line[start + 14..];
-                                if let Some(end) = rest.find('"') {
-                                    account_arg = Some(rest[..end].to_string());
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if let Some(ref acct) = account_arg {
-                    std::process::Command::new("security")
-                        .args(keychain_add_generic_password_args_for_account(
-                            service, acct, value,
-                        ))
-                        .output()
-                } else {
-                    std::process::Command::new("security")
-                        .args(keychain_add_generic_password_args(service, value))
-                        .output()
-                }
-            }
-        }
-        .map_err(|e| format!("keychain write failed: {}", e))?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let first_line = stderr.lines().next().unwrap_or("").trim();
-            return Err(format!("keychain write failed: {}", first_line));
-        }
-
-        return Ok(());
-    }
-
     #[cfg(target_os = "windows")]
     {
         write_windows_generic_credential(service, account, value)
             .map_err(|error| format!("credential write failed: {}", error))
     }
 
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    #[cfg(not(target_os = "windows"))]
     {
         let _ = (service, account, value);
-        Err("keychain API is only supported on macOS and Windows".to_string())
+        Err("keychain API is only supported on Windows".to_string())
     }
 }
 
@@ -351,79 +228,22 @@ fn write_windows_generic_credential(
     Ok(())
 }
 
-fn keychain_add_generic_password_args_for_account(
-    service: &str,
-    account: &str,
-    value: &str,
-) -> Vec<OsString> {
-    vec![
-        OsString::from("add-generic-password"),
-        OsString::from("-U"),
-        OsString::from("-a"),
-        OsString::from(account),
-        OsString::from("-s"),
-        OsString::from(service),
-        OsString::from("-w"),
-        OsString::from(value),
-    ]
-}
-
 fn terminal_env_cache() -> &'static Mutex<HashMap<String, Option<String>>> {
     static CACHE: OnceLock<Mutex<HashMap<String, Option<String>>>> = OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-fn shell_from_env() -> Option<String> {
-    let shell = std::env::var("SHELL").ok()?;
-    let trimmed = shell.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-    let file = std::path::Path::new(trimmed).file_name()?.to_string_lossy();
-    let allowed = file == "zsh" || file == "bash" || file == "fish";
-    if allowed {
-        Some(trimmed.to_string())
-    } else {
-        None
-    }
-}
-
-fn read_env_from_interactive_shell(program: &str, name: &str) -> Option<String> {
-    let script = format!("printenv {}", name);
-    read_env_value_via_command(program, &["-ilc", script.as_str()])
-}
-
 fn read_env_from_interactive_shells(name: &str) -> Option<String> {
     #[cfg(target_os = "windows")]
     {
-        return read_env_from_windows_environment(name);
+        read_env_from_windows_environment(name)
     }
 
-    let mut programs: Vec<String> = Vec::new();
-
-    if let Some(shell) = shell_from_env() {
-        programs.push(shell);
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = name;
+        None
     }
-
-    for program in [
-        "/bin/zsh",
-        "/bin/bash",
-        "/opt/homebrew/bin/fish",
-        "/usr/local/bin/fish",
-        "/opt/local/bin/fish",
-    ] {
-        if !programs.iter().any(|p| p == program) {
-            programs.push(program.to_string());
-        }
-    }
-
-    for program in programs {
-        if let Some(value) = read_env_from_interactive_shell(program.as_str(), name) {
-            return Some(value);
-        }
-    }
-
-    None
 }
 
 #[cfg(target_os = "windows")]
@@ -2340,10 +2160,7 @@ fn inject_keychain<'js>(
         Function::new(
             ctx.clone(),
             move |ctx_inner: Ctx<'_>, service: String| -> rquickjs::Result<String> {
-                #[cfg(target_os = "windows")]
                 let account = current_windows_credential_account();
-                #[cfg(not(target_os = "windows"))]
-                let account = current_macos_keychain_account();
                 let redacted_account = redact_value(&account);
                 log::info!(
                     "[plugin:{}] keychain read: service={}, account={}",
@@ -2410,10 +2227,7 @@ fn inject_keychain<'js>(
         Function::new(
             ctx.clone(),
             move |ctx_inner: Ctx<'_>, service: String, value: String| -> rquickjs::Result<()> {
-                #[cfg(target_os = "windows")]
                 let account = current_windows_credential_account();
-                #[cfg(not(target_os = "windows"))]
-                let account = current_macos_keychain_account();
                 let redacted_account = redact_value(&account);
                 log::info!(
                     "[plugin:{}] keychain write: service={}, account={}",
@@ -2466,7 +2280,7 @@ fn inject_sqlite<'js>(ctx: &Ctx<'js>, host: &Object<'js>) -> rquickjs::Result<()
                 let expanded = expand_path(&db_path);
 
                 // Prefer a normal read-only open so WAL contents are visible (common for app state DBs).
-                // Fall back to immutable=1 to bypass WAL/SHM lock issues after macOS sleep.
+                // Fall back to immutable=1 to bypass WAL/SHM lock issues.
                 let mut primary_command = std::process::Command::new("sqlite3");
                 primary_command.args(["-readonly", "-json", &expanded, &sql]);
                 configure_hidden_command_window(&mut primary_command);
@@ -2885,14 +2699,6 @@ mod tests {
     }
 
     #[test]
-    fn current_macos_keychain_account_prefers_explicit_user_value() {
-        assert_eq!(
-            current_macos_keychain_account_from_user_env(Some("openusage-test-user".to_string())),
-            "openusage-test-user"
-        );
-    }
-
-    #[test]
     fn current_windows_credential_account_prefers_explicit_user_value() {
         assert_eq!(
             current_windows_credential_account_from_user_env(Some(
@@ -2968,97 +2774,6 @@ mod tests {
         assert_eq!(
             expand_path(r"$env:OPENUSAGE_TEST_HOME\.claude"),
             r"C:\OpenUsageTest\.claude"
-        );
-    }
-
-    #[test]
-    fn keychain_find_generic_password_args_include_service_only_lookup() {
-        let args = keychain_find_generic_password_args("Claude Code-credentials");
-        let rendered: Vec<String> = args
-            .into_iter()
-            .map(|value| value.to_string_lossy().into_owned())
-            .collect();
-
-        assert_eq!(
-            rendered,
-            vec![
-                "find-generic-password",
-                "-s",
-                "Claude Code-credentials",
-                "-w",
-            ]
-        );
-    }
-
-    #[test]
-    fn keychain_find_generic_password_args_for_account_include_account_and_service() {
-        let args = keychain_find_generic_password_args_for_account(
-            "Claude Code-credentials",
-            "openusage-test-user",
-        );
-        let rendered: Vec<String> = args
-            .into_iter()
-            .map(|value| value.to_string_lossy().into_owned())
-            .collect();
-
-        assert_eq!(
-            rendered,
-            vec![
-                "find-generic-password",
-                "-a",
-                "openusage-test-user",
-                "-s",
-                "Claude Code-credentials",
-                "-w",
-            ]
-        );
-    }
-
-    #[test]
-    fn keychain_add_generic_password_args_include_service_only_write() {
-        let args = keychain_add_generic_password_args("Claude Code-credentials", "secret-value");
-        let rendered: Vec<String> = args
-            .into_iter()
-            .map(|value| value.to_string_lossy().into_owned())
-            .collect();
-
-        assert_eq!(
-            rendered,
-            vec![
-                "add-generic-password",
-                "-U",
-                "-s",
-                "Claude Code-credentials",
-                "-w",
-                "secret-value",
-            ]
-        );
-    }
-
-    #[test]
-    fn keychain_add_generic_password_args_for_account_include_update_account_service_and_value() {
-        let args = keychain_add_generic_password_args_for_account(
-            "Claude Code-credentials",
-            "openusage-test-user",
-            "secret-value",
-        );
-        let rendered: Vec<String> = args
-            .into_iter()
-            .map(|value| value.to_string_lossy().into_owned())
-            .collect();
-
-        assert_eq!(
-            rendered,
-            vec![
-                "add-generic-password",
-                "-U",
-                "-a",
-                "openusage-test-user",
-                "-s",
-                "Claude Code-credentials",
-                "-w",
-                "secret-value",
-            ]
         );
     }
 

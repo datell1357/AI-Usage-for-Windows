@@ -9,7 +9,7 @@ type ProbeContext = {
   nowIso: string              // Current UTC time (ISO 8601)
   app: {
     version: string           // App version
-    platform: string          // OS platform (e.g., "macos")
+    platform: string          // OS platform ("windows")
     appDataDir: string        // App data directory
     pluginDataDir: string     // Plugin-specific data dir (auto-created)
   }
@@ -28,7 +28,7 @@ Application metadata:
 | Property        | Description                                             |
 | --------------- | ------------------------------------------------------- |
 | `version`       | App version string                                      |
-| `platform`      | OS platform (e.g., `"macos"`, `"windows"`, `"linux"`)   |
+| `platform`      | OS platform (`"windows"` in this fork)                  |
 | `appDataDir`    | App's data directory path                               |
 | `pluginDataDir` | Plugin-specific data directory (auto-created on demand) |
 
@@ -154,7 +154,7 @@ Reads an environment variable by name.
 - Returns variable value as string when set
 - Returns `null` when missing
 - Variable must be whitelisted first in `src-tauri/src/plugin_engine/host_api.rs`
-- Resolution order: current process env first, then a login+interactive shell lookup (macOS)
+- Resolution order: current process env first, then Windows user/machine environment lookup
 - Values may be cached for the app session; restart OpenUsage after changing shell config
 
 ### Example
@@ -227,17 +227,17 @@ const resp = ctx.host.http.request({
 })
 ```
 
-## Keychain (macOS only)
+## Keychain
 
 ```typescript
 host.keychain.readGenericPassword(service: string): string
 ```
 
-Reads a generic password from the macOS Keychain.
+Reads a generic credential from Windows Credential Manager.
 
 ### Behavior
 
-- **macOS only**: Throws on other platforms
+- **Windows only**: Throws on other platforms
 - **Throws if not found**: Returns the password string if found, throws otherwise
 
 ### Example

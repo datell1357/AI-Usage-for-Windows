@@ -43,4 +43,4 @@ You can also use an authenticated proxy URL:
 
 This applies to provider and plugin HTTP requests that go through OpenUsage's built-in HTTP client.
 
-It is not a general macOS system proxy setting and does not automatically proxy unrelated subprocess network traffic.
+It is not a general Windows system proxy setting and does not automatically proxy unrelated subprocess network traffic.

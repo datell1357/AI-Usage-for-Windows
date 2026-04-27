@@ -1,12 +1,12 @@
 # Track all your AI coding subscriptions in one place
 
-See your usage at a glance from your tray or menu bar. No digging through dashboards.
+See your usage at a glance from the Windows tray. No digging through dashboards.
 
 ![OpenUsage Screenshot](screenshot.png)
 
 ## Download
 
-[**Download the latest upstream release**](https://github.com/robinebers/openusage/releases/latest) (macOS, Apple Silicon & Intel)
+[**Download the latest Windows release**](https://github.com/datell1357/OpenUsage-for-Windows/releases/latest)
 
 This Windows fork is under active development at [datell1357/OpenUsage-for-Windows](https://github.com/datell1357/OpenUsage-for-Windows). The first Windows build targets Claude and Codex only.
 
@@ -14,7 +14,7 @@ The app auto-updates. Install once and you're set.
 
 ## What It Does
 
-OpenUsage lives in your tray or menu bar and shows you how much of your AI coding subscriptions you've used. Progress bars, badges, and clear labels. No mental math required.
+OpenUsage lives in your Windows tray and shows you how much of your AI coding subscriptions you've used. Progress bars, badges, and clear labels. No mental math required.
 
 - **One glance.** All your AI tools, one panel.
 - **Always up-to-date.** Refreshes automatically on a schedule you pick.
@@ -32,24 +32,6 @@ Windows first build:
 - [**Codex**](docs/providers/codex.md) / session, weekly, reviews, credits
 
 Other provider source files remain in the repository, but they are not bundled or enabled in the first Windows build.
-
-Upstream macOS provider set:
-
-- [**Amp**](docs/providers/amp.md) / free tier, bonus, credits
-- [**Antigravity**](docs/providers/antigravity.md) / all models
-- [**Claude**](docs/providers/claude.md) / session, weekly, peak/off-peak, extra usage, local token usage (ccusage)
-- [**Codex**](docs/providers/codex.md) / session, weekly, reviews, credits
-- [**Copilot**](docs/providers/copilot.md) / premium, chat, completions
-- [**Cursor**](docs/providers/cursor.md) / credits, total usage, auto usage, API usage, on-demand, CLI auth
-- [**Factory / Droid**](docs/providers/factory.md) / standard, premium tokens
-- [**Gemini**](docs/providers/gemini.md) / pro, flash, workspace/free/paid tier
-- [**JetBrains AI Assistant**](docs/providers/jetbrains-ai-assistant.md) / quota, remaining
-- [**Kiro**](docs/providers/kiro.md) / credits, bonus credits, overages
-- [**Kimi Code**](docs/providers/kimi.md) / session, weekly
-- [**MiniMax**](docs/providers/minimax.md) / coding plan session
-- [**OpenCode Go**](docs/providers/opencode-go.md) / 5h, weekly, monthly spend limits
-- [**Windsurf**](docs/providers/windsurf.md) / prompt credits, flex credits
-- [**Z.ai**](docs/providers/zai.md) / session, weekly, web searches
 
 Community contributions welcome.
 

@@ -158,7 +158,7 @@ body,
   display: none;                  /* Chrome / Safari / WebKit */
 }
 
-/* Arrow pointing up toward the macOS menu bar icon */
+/* Arrow pointing down toward the Windows tray icon */
 .tray-arrow {
   width: 0;
   height: 0;

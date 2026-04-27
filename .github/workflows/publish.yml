@@ -15,10 +15,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-latest
-            args: "--target aarch64-apple-darwin"
-          - platform: macos-latest
-            args: "--target x86_64-apple-darwin"
           - platform: windows-latest
             args: ""
     runs-on: ${{ matrix.platform }}
@@ -30,11 +26,6 @@ jobs:
           ref: ${{ env.RELEASE_TAG }}
 
       - uses: dtolnay/rust-toolchain@stable
-        if: startsWith(matrix.platform, 'macos')
-        with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
-      - uses: dtolnay/rust-toolchain@stable
-        if: matrix.platform == 'windows-latest'
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
@@ -46,63 +37,47 @@ jobs:
       - name: Bundle plugins
         run: npm run bundle:plugins
       - name: Verify bundled plugins
-        shell: bash
+        shell: pwsh
         run: |
-          COUNT=$(find src-tauri/resources/bundled_plugins -maxdepth 2 -name plugin.json | wc -l | tr -d ' ')
-          if [[ "$COUNT" -lt 1 ]]; then
-            echo "No bundled plugins found under src-tauri/resources/bundled_plugins."
+          $count = @(Get-ChildItem src-tauri/resources/bundled_plugins -Recurse -Filter plugin.json).Count
+          if ($count -lt 1) {
+            Write-Error "No bundled plugins found under src-tauri/resources/bundled_plugins."
             exit 1
-          fi
+          }
 
       - name: Validate release tag
-        shell: bash
+        shell: pwsh
         run: |
-          if [[ -z "$RELEASE_TAG" ]]; then
-            echo "Missing RELEASE_TAG (push a v* tag)."
+          if (-not $env:RELEASE_TAG) {
+            Write-Error "Missing RELEASE_TAG (push a v* tag)."
             exit 1
-          fi
-          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Invalid RELEASE_TAG: $RELEASE_TAG (expected vMAJOR.MINOR.PATCH)"
+          }
+          if ($env:RELEASE_TAG -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') {
+            Write-Error "Invalid RELEASE_TAG: $env:RELEASE_TAG (expected vMAJOR.MINOR.PATCH)"
             exit 1
-          fi
+          }
 
       - name: Validate app version matches tag
-        shell: bash
+        shell: pwsh
         run: |
-          TAG_VERSION="${RELEASE_TAG#v}"
+          $tagVersion = $env:RELEASE_TAG.Substring(1)
 
-          TAURI_CONF_VERSION=$(node -p 'require("./src-tauri/tauri.conf.json").version')
-          CARGO_VERSION=$(awk -F'"' '/^version =/ { print $2; exit }' ./src-tauri/Cargo.toml)
-          PKG_VERSION=$(node -p 'require("./package.json").version')
+          $tauriConfVersion = node -p 'require("./src-tauri/tauri.conf.json").version'
+          $cargoVersion = (Select-String -Path ./src-tauri/Cargo.toml -Pattern '^version = "([^"]+)"' | Select-Object -First 1).Matches.Groups[1].Value
+          $pkgVersion = node -p 'require("./package.json").version'
 
-          if [[ "$TAURI_CONF_VERSION" != "$TAG_VERSION" ]]; then
-            echo "src-tauri/tauri.conf.json version ($TAURI_CONF_VERSION) != tag version ($TAG_VERSION)"
+          if ($tauriConfVersion -ne $tagVersion) {
+            Write-Error "src-tauri/tauri.conf.json version ($tauriConfVersion) != tag version ($tagVersion)"
             exit 1
-          fi
-          if [[ "$CARGO_VERSION" != "$TAG_VERSION" ]]; then
-            echo "src-tauri/Cargo.toml version ($CARGO_VERSION) != tag version ($TAG_VERSION)"
+          }
+          if ($cargoVersion -ne $tagVersion) {
+            Write-Error "src-tauri/Cargo.toml version ($cargoVersion) != tag version ($tagVersion)"
             exit 1
-          fi
-          if [[ "$PKG_VERSION" != "$TAG_VERSION" ]]; then
-            echo "package.json version ($PKG_VERSION) != tag version ($TAG_VERSION)"
+          }
+          if ($pkgVersion -ne $tagVersion) {
+            Write-Error "package.json version ($pkgVersion) != tag version ($tagVersion)"
             exit 1
-          fi
-
-      - name: Import Apple Developer Certificate
-        if: startsWith(matrix.platform, 'macos')
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-        run: |
-          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
-          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security set-keychain-settings -t 3600 -u build.keychain
-          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
-          rm certificate.p12
+          }
 
       - uses: tauri-apps/tauri-action@v0
         env:
@@ -110,14 +85,6 @@ jobs:
 
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         with:
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: ${{ env.RELEASE_TAG }}
@@ -127,7 +94,6 @@ jobs:
           args: ${{ matrix.args }}
 
       - name: Verify Windows installer artifacts
-        if: matrix.platform == 'windows-latest'
         shell: pwsh
         run: |
           Get-ChildItem src-tauri/target/release/bundle -Recurse
@@ -138,13 +104,13 @@ jobs:
           }
 
       - name: Verify release assets uploaded
-        shell: bash
+        shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ASSETS=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | tr -d '\r')
+          $assets = gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --json assets --jq '.assets[].name'
 
-          if [ -z "$ASSETS" ]; then
-            echo "No release assets were uploaded for $RELEASE_TAG"
+          if (-not $assets) {
+            Write-Error "No release assets were uploaded for $env:RELEASE_TAG"
             exit 1
-          fi
+          }

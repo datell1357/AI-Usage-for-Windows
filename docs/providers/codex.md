@@ -78,9 +78,9 @@ OpenUsage Codex plugin auth lookup order:
 1. `CODEX_HOME/auth.json` (when `CODEX_HOME` is set)
 2. `~/.config/codex/auth.json`
 3. `~/.codex/auth.json`
-4. macOS keychain service `Codex Auth` (fallback)
+4. Windows Credential Manager service `Codex Auth` (fallback)
 
-Keychain fallback is available on macOS only.
+Credential Manager fallback is available on Windows.
 
 Expected auth payload shape (file or keychain JSON value):
 

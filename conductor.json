@@ -1,0 +1,6 @@
+{
+    "scripts": {
+        "setup": "bun install; for d in .claude .codex .cursor; do [ -d \"$CONDUCTOR_ROOT_PATH/$d\" ] && mkdir -p \"$CONDUCTOR_WORKSPACE_PATH/$d\" && rsync -a \"$CONDUCTOR_ROOT_PATH/$d/.\" \"$CONDUCTOR_WORKSPACE_PATH/$d/\"; done; [ -f \"$CONDUCTOR_ROOT_PATH/.env\" ] && cp \"$CONDUCTOR_ROOT_PATH/.env\" \"$CONDUCTOR_WORKSPACE_PATH/.env\" || true",
+        "run": "bun run tauri dev"
+    }
+}

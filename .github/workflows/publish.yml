@@ -1,0 +1,116 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: ""
+    runs-on: ${{ matrix.platform }}
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install
+      - name: Bundle plugins
+        run: npm run bundle:plugins
+      - name: Verify bundled plugins
+        shell: pwsh
+        run: |
+          $count = @(Get-ChildItem src-tauri/resources/bundled_plugins -Recurse -Filter plugin.json).Count
+          if ($count -lt 1) {
+            Write-Error "No bundled plugins found under src-tauri/resources/bundled_plugins."
+            exit 1
+          }
+
+      - name: Validate release tag
+        shell: pwsh
+        run: |
+          if (-not $env:RELEASE_TAG) {
+            Write-Error "Missing RELEASE_TAG (push a v* tag)."
+            exit 1
+          }
+          if ($env:RELEASE_TAG -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') {
+            Write-Error "Invalid RELEASE_TAG: $env:RELEASE_TAG (expected vMAJOR.MINOR.PATCH)"
+            exit 1
+          }
+
+      - name: Validate app version matches tag
+        shell: pwsh
+        run: |
+          $tagVersion = $env:RELEASE_TAG.Substring(1)
+
+          $tauriConfVersion = node -p 'require("./src-tauri/tauri.conf.json").version'
+          $cargoVersion = (Select-String -Path ./src-tauri/Cargo.toml -Pattern '^version = "([^"]+)"' | Select-Object -First 1).Matches.Groups[1].Value
+          $pkgVersion = node -p 'require("./package.json").version'
+
+          if ($tauriConfVersion -ne $tagVersion) {
+            Write-Error "src-tauri/tauri.conf.json version ($tauriConfVersion) != tag version ($tagVersion)"
+            exit 1
+          }
+          if ($cargoVersion -ne $tagVersion) {
+            Write-Error "src-tauri/Cargo.toml version ($cargoVersion) != tag version ($tagVersion)"
+            exit 1
+          }
+          if ($pkgVersion -ne $tagVersion) {
+            Write-Error "package.json version ($pkgVersion) != tag version ($tagVersion)"
+            exit 1
+          }
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: ${{ env.RELEASE_TAG }}
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: false
+          args: ${{ matrix.args }}
+
+      - name: Verify Windows installer artifacts
+        shell: pwsh
+        run: |
+          Get-ChildItem src-tauri/target/release/bundle -Recurse
+          $installers = Get-ChildItem src-tauri/target/release/bundle -Recurse -Include *.msi,*.exe
+          if (-not $installers) {
+            Write-Error "No Windows installer artifacts (.msi or .exe) found."
+            exit 1
+          }
+
+      - name: Verify release assets uploaded
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $assets = gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --json assets --jq '.assets[].name'
+
+          if (-not $assets) {
+            Write-Error "No release assets were uploaded for $env:RELEASE_TAG"
+            exit 1
+          }

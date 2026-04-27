@@ -1,0 +1,48 @@
+[package]
+name = "ai-usage"
+version = "0.1.0"
+description = "AI Usage is an open source AI subscription limit tracker"
+authors = ["Yeoreum"]
+edition = "2024"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "ai_usage_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+time = { version = "0.3.47", features = ["formatting"] }
+dirs = "6"
+log = "0.4"
+reqwest = { version = "0.13", features = ["blocking", "socks"] }
+rquickjs = { version = "0.11", features = ["bindgen"] }
+tauri-plugin-store = "2.4.2"
+base64 = "0.22"
+uuid = { version = "1", features = ["v4"] }
+tauri-plugin-log = "2"
+tauri-plugin-aptabase = { git = "https://github.com/aptabase/tauri-plugin-aptabase", rev = "e896cceb" }
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-autostart = "2.5.1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+regex-lite = "0.1.9"
+aes-gcm = "0.10.3"
+rusqlite = { version = "0.37", features = ["bundled"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Credentials"] }
+
+[dev-dependencies]
+serial_test = "3.4.0"

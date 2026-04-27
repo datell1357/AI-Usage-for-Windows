@@ -28,7 +28,8 @@ $headers = @{
   "X-GitHub-Api-Version" = "2022-11-28"
 }
 
-$body = Get-Content -LiteralPath $BodyPath -Raw
+$resolvedBodyPath = (Resolve-Path -LiteralPath $BodyPath).Path
+$body = [System.IO.File]::ReadAllText($resolvedBodyPath)
 $release = $null
 try {
   $release = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/$Repository/releases/tags/$Tag" -Method Get

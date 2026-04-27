@@ -33,6 +33,9 @@ const EMPTY_TRAY_SETTINGS_PREVIEW: TraySettingsPreview = {
   providerPercentText: "--%",
 }
 
+const isWindowsPlatform = () =>
+  typeof window !== "undefined" && /Win/i.test(window.navigator.platform || "")
+
 function isSameTraySettingsPreview(a: TraySettingsPreview, b: TraySettingsPreview): boolean {
   if (a.providerIconUrl !== b.providerIconUrl) return false
   if (a.providerPercentText !== b.providerPercentText) return false
@@ -155,7 +158,7 @@ export function useTrayIcon({
         if (gaugePath) {
           Promise.all([
             tray.setIcon(gaugePath),
-            tray.setIconAsTemplate(true),
+            tray.setIconAsTemplate(!isWindowsPlatform()),
             setTrayTitle(""),
             setTrayTooltip("OpenUsage"),
           ])
@@ -254,7 +257,7 @@ export function useTrayIcon({
         })
           .then(async (img) => {
             await tray.setIcon(img)
-            await tray.setIconAsTemplate(true)
+            await tray.setIconAsTemplate(!isWindowsPlatform())
             await setTrayTitle("")
             await updateTooltip()
           })
@@ -282,7 +285,7 @@ export function useTrayIcon({
         })
           .then(async (img) => {
             await tray.setIcon(img)
-            await tray.setIconAsTemplate(true)
+            await tray.setIconAsTemplate(!isWindowsPlatform())
             await setTrayTitle("")
             await updateTooltip()
           })
@@ -304,7 +307,7 @@ export function useTrayIcon({
       })
         .then(async (img) => {
           await tray.setIcon(img)
-          await tray.setIconAsTemplate(true)
+          await tray.setIconAsTemplate(!isWindowsPlatform())
           await setTrayTitle(providerPercentText)
           await updateTooltip()
         })

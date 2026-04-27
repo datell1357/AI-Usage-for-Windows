@@ -142,7 +142,7 @@ pub fn create(app_handle: &AppHandle) -> tauri::Result<()> {
 
     TrayIconBuilder::with_id("tray")
         .icon(icon)
-        .icon_as_template(true)
+        .icon_as_template(!cfg!(target_os = "windows"))
         .tooltip("OpenUsage")
         .menu(&menu)
         .show_menu_on_left_click(false)

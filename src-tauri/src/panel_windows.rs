@@ -1,4 +1,4 @@
-use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, Position, Size};
+use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, Position, Size, webview::Color};
 
 const WINDOW_LABEL: &str = "main";
 const PANEL_MARGIN: i32 = 12;
@@ -8,6 +8,8 @@ pub fn init(app_handle: &AppHandle) -> tauri::Result<()> {
         window.set_decorations(false)?;
         window.set_resizable(false)?;
         window.set_skip_taskbar(true)?;
+        window.set_shadow(false)?;
+        window.set_background_color(Some(Color(0, 0, 0, 0)))?;
     }
     Ok(())
 }
@@ -20,7 +22,9 @@ pub fn show_panel(app_handle: &AppHandle) {
 
     position_window_near_tray(app_handle, None, None);
     let _ = window.set_skip_taskbar(true);
+    let _ = window.set_background_color(Some(Color(0, 0, 0, 0)));
     let _ = window.show();
+    position_panel_near_tray(app_handle);
     let _ = window.set_focus();
 }
 
@@ -79,16 +83,25 @@ fn position_window_near_tray(
         let mut y = icon_y - panel_size.height as i32 - PANEL_MARGIN;
 
         if let Ok(Some(monitor)) = window.current_monitor().or_else(|_| window.primary_monitor()) {
-            let origin = monitor.position();
-            let size = monitor.size();
+            let work_area = monitor.work_area();
+            let origin = work_area.position;
+            let size = work_area.size;
             let right = origin.x + size.width as i32;
             let bottom = origin.y + size.height as i32;
-            x = x.clamp(origin.x + PANEL_MARGIN, right - panel_size.width as i32 - PANEL_MARGIN);
+            x = clamp_to_available_span(
+                x,
+                origin.x + PANEL_MARGIN,
+                right - panel_size.width as i32 - PANEL_MARGIN,
+            );
 
             if y < origin.y + PANEL_MARGIN {
                 y = icon_y + icon_h as i32 + PANEL_MARGIN;
             }
-            y = y.clamp(origin.y + PANEL_MARGIN, bottom - panel_size.height as i32 - PANEL_MARGIN);
+            y = clamp_to_available_span(
+                y,
+                origin.y + PANEL_MARGIN,
+                bottom - panel_size.height as i32 - PANEL_MARGIN,
+            );
         } else {
             x = x.max(0);
             y = y.max(0);
@@ -99,11 +112,20 @@ fn position_window_near_tray(
     }
 
     if let Ok(Some(monitor)) = window.current_monitor().or_else(|_| window.primary_monitor()) {
-        let origin = monitor.position();
-        let size = monitor.size();
-        let x = origin.x + size.width as i32 - panel_size.width as i32 - PANEL_MARGIN;
-        let y = origin.y + size.height as i32 - panel_size.height as i32 - 48;
-        let _ = window.set_position(PhysicalPosition::new(x.max(origin.x), y.max(origin.y)));
+        let work_area = monitor.work_area();
+        let origin = work_area.position;
+        let size = work_area.size;
+        let x = origin.x + PANEL_MARGIN;
+        let y = origin.y + size.height as i32 - panel_size.height as i32 - PANEL_MARGIN;
+        let _ = window.set_position(PhysicalPosition::new(x, y.max(origin.y + PANEL_MARGIN)));
+    }
+}
+
+fn clamp_to_available_span(value: i32, min: i32, max: i32) -> i32 {
+    if max < min {
+        min
+    } else {
+        value.clamp(min, max)
     }
 }
 

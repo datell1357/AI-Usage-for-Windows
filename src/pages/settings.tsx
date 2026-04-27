@@ -413,12 +413,12 @@ export function SettingsPage({
         </div>
       </section>
       <section>
-        <h3 className="text-lg font-semibold mb-0">Menubar Icon</h3>
+        <h3 className="text-lg font-semibold mb-0">Tray Icon</h3>
         <p className="text-sm text-muted-foreground mb-2">
-          What shows in the menu bar
+          What shows in the tray
         </p>
         <div className="bg-muted/50 rounded-lg p-1">
-          <div className="flex gap-1" role="radiogroup" aria-label="Menubar icon style">
+          <div className="flex gap-1" role="radiogroup" aria-label="Tray icon style">
             {MENUBAR_ICON_STYLE_OPTIONS.map((option) => {
               const isActive = option.value === menubarIconStyle;
               return (

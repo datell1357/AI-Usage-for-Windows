@@ -247,8 +247,16 @@ import { useAppPluginStore } from "@/stores/app-plugin-store"
 import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 import { useAppUiStore } from "@/stores/app-ui-store"
 
+function mockNavigatorPlatform(platform: string) {
+  Object.defineProperty(window.navigator, "platform", {
+    configurable: true,
+    get: () => platform,
+  })
+}
+
 describe("App", () => {
   beforeEach(() => {
+    mockNavigatorPlatform("MacIntel")
     useAppUiStore.getState().resetState()
     useAppPluginStore.getState().resetState()
     useAppPreferencesStore.getState().resetState()
@@ -699,7 +707,7 @@ describe("App", () => {
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
 
-    expect(screen.getByText("Menubar Icon")).toBeVisible()
+    expect(screen.getByText("Tray Icon")).toBeVisible()
     const barsRadio = await screen.findByRole("radio", { name: "Bars" })
     await userEvent.click(barsRadio)
     expect(state.saveMenubarIconStyleMock).toHaveBeenCalledWith("bars")
@@ -716,7 +724,7 @@ describe("App", () => {
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
 
-    expect(screen.getByText("Menubar Icon")).toBeVisible()
+    expect(screen.getByText("Tray Icon")).toBeVisible()
     const donutRadio = await screen.findByRole("radio", { name: "Donut" })
     await userEvent.click(donutRadio)
     expect(state.saveMenubarIconStyleMock).toHaveBeenCalledWith("donut")

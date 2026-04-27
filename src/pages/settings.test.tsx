@@ -191,10 +191,10 @@ describe("SettingsPage", () => {
     expect(screen.getByText("Reset Timers")).toBeInTheDocument()
   })
 
-  it("renders menubar icon section", () => {
+  it("renders tray icon section", () => {
     render(<SettingsPage {...defaultProps} />)
-    expect(screen.getByText("Menubar Icon")).toBeInTheDocument()
-    expect(screen.getByText("What shows in the menu bar")).toBeInTheDocument()
+    expect(screen.getByText("Tray Icon")).toBeInTheDocument()
+    expect(screen.getByText("What shows in the tray")).toBeInTheDocument()
   })
 
   it("clicking Bars triggers onMenubarIconStyleChange(\"bars\")", async () => {

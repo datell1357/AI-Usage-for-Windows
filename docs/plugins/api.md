@@ -28,7 +28,7 @@ Application metadata:
 | Property        | Description                                             |
 | --------------- | ------------------------------------------------------- |
 | `version`       | App version string                                      |
-| `platform`      | OS platform (`"windows"` in this fork)                  |
+| `platform`      | OS platform (`"windows"` for AI Usage Windows builds)   |
 | `appDataDir`    | App's data directory path                               |
 | `pluginDataDir` | Plugin-specific data directory (auto-created on demand) |
 

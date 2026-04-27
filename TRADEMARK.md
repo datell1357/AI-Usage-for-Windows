@@ -1,20 +1,21 @@
-# Branding Notice
+# Branding and Attribution
 
-## The AI Usage Brand
+## AI Usage Identity
 
-AI Usage is the Windows-focused name and visual identity used by this repository.
-It is intentionally distinct from the upstream project's name, logo, and visual
-identity.
+This repository distributes a Windows app named AI Usage. Use `AI Usage` for the app name, installer name, release notes, screenshots, documentation, logs, and user-facing copy.
 
-## Upstream Attribution
+The app icon and release artwork should come from this repository's AI Usage assets. Provider icons may be shown only as provider identifiers inside the app.
 
-This project is based on MIT-licensed source code from an upstream AI usage
-tracking project. The upstream copyright and MIT license notice remain in
-[LICENSE](LICENSE).
+## Source Attribution
+
+AI Usage includes modifications to MIT-licensed source code. Required copyright and permission notices are preserved in `LICENSE`.
+
+Source attribution is not product branding. Do not describe AI Usage as an official build, release, or service from another project.
 
 ## Distribution Rules
 
-- Do not present AI Usage as an official upstream release.
-- Do not reuse upstream-only logos or visual identity in AI Usage builds.
-- Keep the MIT license notice with source and binary distributions.
-- Use the AI Usage name and assets only for this Windows project.
+- Ship Windows builds under the AI Usage name.
+- Do not use another project's product name as this app's title.
+- Do not use another project's logo for the app icon, installer icon, tray icon, or release artwork.
+- Keep source and license attribution in repository files, not in app marketing copy.
+- Keep provider trademarks limited to identifying supported third-party services.

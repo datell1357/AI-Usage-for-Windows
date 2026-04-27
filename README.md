@@ -101,7 +101,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Keep changes focused, include validation
 
 Built by [Yeoreum](https://www.threads.com/@mini.yeoreum).
 
-AI Usage is based on MIT-licensed upstream source code and keeps the original copyright notice in [LICENSE](LICENSE). This repository uses the AI Usage name and assets for the Windows project and does not present itself as an official upstream release.
+AI Usage includes modifications to MIT-licensed source code. Required copyright and permission notices are preserved in [LICENSE](LICENSE).
 
 ## License
 

@@ -1,7 +1,7 @@
 use tauri::image::Image;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::path::BaseDirectory;
-use tauri::tray::{MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_store::StoreExt;
 
@@ -183,10 +183,13 @@ pub fn create(app_handle: &AppHandle) -> tauri::Result<()> {
             let app_handle = tray.app_handle();
 
             if let TrayIconEvent::Click {
-                button_state, rect, ..
+                button,
+                button_state,
+                rect,
+                ..
             } = event
             {
-                if button_state == MouseButtonState::Up {
+                if button == MouseButton::Left && button_state == MouseButtonState::Up {
                     #[cfg(target_os = "windows")]
                     {
                         log::debug!("tray click: toggling window panel");

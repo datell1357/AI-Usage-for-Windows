@@ -4,7 +4,7 @@ AI Usage exposes a read-only HTTP API on the loopback interface so other local a
 
 **Base URL:** `http://127.0.0.1:6736`
 
-The server starts automatically with the app. If the port is already in use, the feature is silently disabled for that session.
+The server is disabled by default so the app does not open a loopback socket during normal startup. To enable it, set `AI_USAGE_ENABLE_LOCAL_HTTP_API=1` before launching AI Usage. If the port is already in use, the feature is silently disabled for that session.
 
 ## Routes
 

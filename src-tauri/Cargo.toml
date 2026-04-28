@@ -1,6 +1,6 @@
 [package]
 name = "ai-usage"
-version = "0.1.0"
+version = "0.1.1"
 description = "AI Usage is an open source AI subscription limit tracker"
 authors = ["Yeoreum"]
 edition = "2024"
@@ -31,7 +31,6 @@ tauri-plugin-store = "2.4.2"
 base64 = "0.22"
 uuid = { version = "1", features = ["v4"] }
 tauri-plugin-log = "2"
-tauri-plugin-aptabase = { git = "https://github.com/aptabase/tauri-plugin-aptabase", rev = "e896cceb" }
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 tauri-plugin-global-shortcut = "2"

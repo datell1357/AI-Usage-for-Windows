@@ -13,7 +13,6 @@
     "core:window:allow-scale-factor",
     "opener:default",
     "store:default",
-    "aptabase:allow-track-event",
     "updater:default",
     "process:allow-restart",
     "global-shortcut:default",

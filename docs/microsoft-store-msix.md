@@ -33,7 +33,7 @@ The Tauri bundle metadata sets `publisher` to `Yeoreum` so converted installer m
 3. Create a new package from the generated MSI:
 
    ```text
-   src-tauri\target\release\bundle\msi\AI Usage_0.1.0_x64_en-US.msi
+   src-tauri\target\release\bundle\msi\AI Usage_0.1.1_x64_en-US.msi
    ```
 
 4. In the package information step, use:
@@ -41,7 +41,7 @@ The Tauri bundle metadata sets `publisher` to `Yeoreum` so converted installer m
    - Package name: `AIUsage`
    - Package display name: `AI Usage`
    - Publisher display name: `Yeoreum`
-   - Version: `0.1.0.0`
+   - Version: `0.1.1.0`
 
 5. Finish packaging and submit the generated `.msix` or `.msixbundle` in Partner Center.
 

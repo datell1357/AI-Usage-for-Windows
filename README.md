@@ -23,7 +23,7 @@ AI Usage는 Windows 시스템 트레이에서만 동작하며 작업표시줄에
 - 글로벌 단축키 지원
 - 기본 5분 자동 새로고침
 - 기본 Start on Login 활성화
-- `127.0.0.1:6736` 로컬 HTTP API
+- 선택적 로컬 HTTP API (`AI_USAGE_ENABLE_LOCAL_HTTP_API=1` 설정 시 `127.0.0.1:6736`)
 - Provider HTTP 요청 프록시 지원
 - 플러그인 기반 provider 구조
 
@@ -99,8 +99,8 @@ npm.cmd run tauri -- build
 
 설치 파일은 다음 경로에 생성됩니다.
 
-- `src-tauri\target\release\bundle\nsis\AI Usage_0.1.0_x64-setup.exe`
-- `src-tauri\target\release\bundle\msi\AI Usage_0.1.0_x64_en-US.msi`
+- `src-tauri\target\release\bundle\nsis\AI Usage_0.1.1_x64-setup.exe`
+- `src-tauri\target\release\bundle\msi\AI Usage_0.1.1_x64_en-US.msi`
 
 ### 크레딧
 
@@ -135,7 +135,7 @@ The app runs from the Windows system tray, stays out of the taskbar, and opens a
 - Global shortcut support
 - Automatic refresh, defaulting to 5 minutes
 - Start on Login enabled by default
-- Local HTTP API at `127.0.0.1:6736`
+- Optional local HTTP API at `127.0.0.1:6736` when `AI_USAGE_ENABLE_LOCAL_HTTP_API=1` is set
 - Proxy support for provider HTTP requests
 - Plugin-based provider architecture
 
@@ -211,8 +211,8 @@ npm.cmd run tauri -- build
 
 Installers are written to:
 
-- `src-tauri\target\release\bundle\nsis\AI Usage_0.1.0_x64-setup.exe`
-- `src-tauri\target\release\bundle\msi\AI Usage_0.1.0_x64_en-US.msi`
+- `src-tauri\target\release\bundle\nsis\AI Usage_0.1.1_x64-setup.exe`
+- `src-tauri\target\release\bundle\msi\AI Usage_0.1.1_x64_en-US.msi`
 
 ### Credits
 

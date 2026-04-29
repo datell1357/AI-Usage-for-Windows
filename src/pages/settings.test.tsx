@@ -60,6 +60,17 @@ const defaultProps = {
   onGlobalShortcutChange: vi.fn(),
   startOnLogin: false,
   onStartOnLoginChange: vi.fn(),
+  mobileSyncStatus: {
+    baseUrlConfigured: true,
+    credentialStored: false,
+    isLinked: false,
+    connection: null,
+  },
+  mobileSyncBusy: false,
+  mobileSyncError: null,
+  onMobileSyncLink: vi.fn(),
+  onMobileSyncSyncNow: vi.fn(),
+  onMobileSyncUnlink: vi.fn(),
 }
 
 afterEach(() => {
@@ -207,5 +218,12 @@ describe("SettingsPage", () => {
     )
     await userEvent.click(screen.getByText("Start on login"))
     expect(onStartOnLoginChange).toHaveBeenCalledWith(true)
+  })
+
+  it("renders mobile sync pairing controls when no device is linked", () => {
+    render(<SettingsPage {...defaultProps} />)
+    expect(screen.getByText("Mobile Sync")).toBeInTheDocument()
+    expect(screen.getByText("6-digit pairing code")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Link Mobile App" })).toBeInTheDocument()
   })
 })

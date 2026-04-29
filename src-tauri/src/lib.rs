@@ -10,15 +10,89 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::Emitter;
 use tauri_plugin_log::{Target, TargetKind};
+use tauri_plugin_store::StoreExt;
 use uuid::Uuid;
 
 #[cfg(desktop)]
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 const GLOBAL_SHORTCUT_STORE_KEY: &str = "globalShortcut";
+const MOBILE_SYNC_STORE_KEY: &str = "mobileSync";
+const MOBILE_SYNC_UPLOAD_TOKEN_SERVICE: &str = "mobile-sync-upload-token";
+const MOBILE_SYNC_PROTOCOL_VERSION: u32 = 1;
+const MOBILE_SYNC_SCHEMA_VERSION: u32 = 1;
+const MOBILE_SYNC_HTTP_TIMEOUT_MS: u64 = 10_000;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MobileSyncConnection {
+    device_id: String,
+    device_name: String,
+    linked_at: String,
+    last_uploaded_at: Option<String>,
+    last_upload_status: String,
+    last_error: Option<String>,
+    sync_protocol_version: u32,
+    schema_version: u32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MobileSyncStatus {
+    base_url_configured: bool,
+    credential_stored: bool,
+    is_linked: bool,
+    connection: Option<MobileSyncConnection>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MobileSyncSnapshotProvider {
+    provider_id: String,
+    display_name: String,
+    icon_url: String,
+    plan: Option<String>,
+    status: String,
+    lines: Vec<serde_json::Value>,
+    error: Option<String>,
+    refreshed_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MobileSyncSnapshot {
+    schema_version: u32,
+    generated_at: String,
+    providers: Vec<MobileSyncSnapshotProvider>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ConsumePairingCodeRequest {
+    code: String,
+    device_name: String,
+    platform: String,
+    app_version: String,
+    sync_protocol_version: u32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ConsumePairingCodeResponse {
+    device_id: String,
+    upload_token: String,
+    sync_protocol_version: u32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UploadLatestSnapshotRequest {
+    device_id: String,
+    snapshot: MobileSyncSnapshot,
+}
 
 #[cfg(desktop)]
 fn managed_shortcut_slot() -> &'static Mutex<Option<String>> {
@@ -395,6 +469,144 @@ fn list_plugins(state: tauri::State<'_, Mutex<AppState>>) -> Vec<PluginMeta> {
         .collect()
 }
 
+#[tauri::command]
+fn mobile_sync_get_status(app_handle: tauri::AppHandle) -> MobileSyncStatus {
+    build_mobile_sync_status(load_mobile_sync_connection(&app_handle))
+}
+
+#[tauri::command]
+async fn mobile_sync_link_device(
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, Mutex<AppState>>,
+    code: String,
+    device_name: String,
+    snapshot: MobileSyncSnapshot,
+) -> Result<MobileSyncStatus, String> {
+    let normalized_code = code.trim().to_string();
+    if normalized_code.len() != 6 || !normalized_code.chars().all(|ch| ch.is_ascii_digit()) {
+        return Err("Pairing code must be exactly 6 digits".to_string());
+    }
+    validate_mobile_sync_snapshot(&snapshot)?;
+
+    let base_url = mobile_sync_base_url()?;
+    let app_version = {
+        let locked = state.lock().map_err(|error| error.to_string())?;
+        locked.app_version.clone()
+    };
+    let resolved_device_name = {
+        let trimmed = device_name.trim();
+        if trimmed.is_empty() {
+            default_mobile_sync_device_name()
+        } else {
+            trimmed.to_string()
+        }
+    };
+
+    let request = ConsumePairingCodeRequest {
+        code: normalized_code,
+        device_name: resolved_device_name.clone(),
+        platform: "windows".to_string(),
+        app_version,
+        sync_protocol_version: MOBILE_SYNC_PROTOCOL_VERSION,
+    };
+
+    let response = tauri::async_runtime::spawn_blocking({
+        let base_url = base_url.clone();
+        let request = request.clone();
+        move || consume_pairing_code(&base_url, &request)
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+
+    plugin_engine::host_api::write_keychain_generic_password(
+        MOBILE_SYNC_UPLOAD_TOKEN_SERVICE,
+        Some(&response.device_id),
+        &response.upload_token,
+    )?;
+
+    let mut connection = MobileSyncConnection {
+        device_id: response.device_id.clone(),
+        device_name: resolved_device_name,
+        linked_at: now_iso_string(),
+        last_uploaded_at: None,
+        last_upload_status: "idle".to_string(),
+        last_error: None,
+        sync_protocol_version: response.sync_protocol_version,
+        schema_version: MOBILE_SYNC_SCHEMA_VERSION,
+    };
+
+    let upload_result = tauri::async_runtime::spawn_blocking({
+        let base_url = base_url.clone();
+        let request = UploadLatestSnapshotRequest {
+            device_id: response.device_id.clone(),
+            snapshot,
+        };
+        let upload_token = response.upload_token.clone();
+        move || upload_mobile_sync_snapshot(&base_url, &upload_token, &request)
+    })
+    .await
+    .map_err(|error| error.to_string())?;
+
+    match upload_result {
+        Ok(()) => {
+            connection.last_uploaded_at = Some(now_iso_string());
+            connection.last_upload_status = "success".to_string();
+            connection.last_error = None;
+        }
+        Err(error) => {
+            connection.last_upload_status = "error".to_string();
+            connection.last_error = Some(error);
+        }
+    }
+
+    save_mobile_sync_connection(&app_handle, Some(&connection))?;
+    Ok(build_mobile_sync_status(Some(connection)))
+}
+
+#[tauri::command]
+async fn mobile_sync_sync_now(
+    app_handle: tauri::AppHandle,
+    snapshot: MobileSyncSnapshot,
+) -> Result<MobileSyncStatus, String> {
+    validate_mobile_sync_snapshot(&snapshot)?;
+    let base_url = mobile_sync_base_url()?;
+    let mut connection = load_mobile_sync_connection(&app_handle)
+        .ok_or_else(|| "Mobile Sync is not linked on this device".to_string())?;
+    let upload_token = plugin_engine::host_api::read_keychain_generic_password(
+        MOBILE_SYNC_UPLOAD_TOKEN_SERVICE,
+        Some(&connection.device_id),
+    )?;
+
+    tauri::async_runtime::spawn_blocking({
+        let base_url = base_url.clone();
+        let request = UploadLatestSnapshotRequest {
+            device_id: connection.device_id.clone(),
+            snapshot,
+        };
+        move || upload_mobile_sync_snapshot(&base_url, &upload_token, &request)
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+
+    connection.last_uploaded_at = Some(now_iso_string());
+    connection.last_upload_status = "success".to_string();
+    connection.last_error = None;
+    save_mobile_sync_connection(&app_handle, Some(&connection))?;
+    Ok(build_mobile_sync_status(Some(connection)))
+}
+
+#[tauri::command]
+fn mobile_sync_unlink_device(app_handle: tauri::AppHandle) -> Result<MobileSyncStatus, String> {
+    if let Some(connection) = load_mobile_sync_connection(&app_handle) {
+        let _ = plugin_engine::host_api::delete_keychain_generic_password(
+            MOBILE_SYNC_UPLOAD_TOKEN_SERVICE,
+            Some(&connection.device_id),
+        );
+    }
+    save_mobile_sync_connection(&app_handle, None)?;
+    Ok(build_mobile_sync_status(None))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let runtime = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
@@ -430,7 +642,11 @@ pub fn run() {
             start_probe_batch,
             list_plugins,
             get_log_path,
-            update_global_shortcut
+            update_global_shortcut,
+            mobile_sync_get_status,
+            mobile_sync_link_device,
+            mobile_sync_sync_now,
+            mobile_sync_unlink_device
         ])
         .setup(|app| {
             use tauri::Manager;
@@ -525,4 +741,160 @@ mod tests {
     fn global_shortcut_store_key_is_stable() {
         assert_eq!(GLOBAL_SHORTCUT_STORE_KEY, "globalShortcut");
     }
+}
+
+fn now_iso_string() -> String {
+    time::OffsetDateTime::now_utc()
+        .format(&time::format_description::well_known::Rfc3339)
+        .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string())
+}
+
+fn default_mobile_sync_device_name() -> String {
+    std::env::var("COMPUTERNAME")
+        .ok()
+        .or_else(|| std::env::var("HOSTNAME").ok())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "Windows PC".to_string())
+}
+
+fn mobile_sync_base_url() -> Result<String, String> {
+    std::env::var("AI_USAGE_MOBILE_SYNC_BASE_URL")
+        .map_err(|_| "Mobile Sync backend URL is not configured".to_string())
+        .map(|value| value.trim().trim_end_matches('/').to_string())
+        .and_then(|value| {
+            if value.is_empty() {
+                Err("Mobile Sync backend URL is not configured".to_string())
+            } else {
+                Ok(value)
+            }
+        })
+}
+
+fn load_mobile_sync_connection(app_handle: &tauri::AppHandle) -> Option<MobileSyncConnection> {
+    let store = app_handle.store("settings.json").ok()?;
+    let value = store.get(MOBILE_SYNC_STORE_KEY)?;
+    serde_json::from_value(value).ok()
+}
+
+fn save_mobile_sync_connection(
+    app_handle: &tauri::AppHandle,
+    connection: Option<&MobileSyncConnection>,
+) -> Result<(), String> {
+    let store = app_handle
+        .store("settings.json")
+        .map_err(|error| format!("failed to open settings store: {}", error))?;
+    let value = match connection {
+        Some(connection) => serde_json::to_value(connection)
+            .map_err(|error| format!("failed to serialize mobile sync state: {}", error))?,
+        None => serde_json::Value::Null,
+    };
+    store.set(MOBILE_SYNC_STORE_KEY, value);
+    store
+        .save()
+        .map_err(|error| format!("failed to save mobile sync state: {}", error))
+}
+
+fn mobile_sync_credential_stored(connection: Option<&MobileSyncConnection>) -> bool {
+    connection
+        .and_then(|connection| {
+            plugin_engine::host_api::read_keychain_generic_password(
+                MOBILE_SYNC_UPLOAD_TOKEN_SERVICE,
+                Some(&connection.device_id),
+            )
+            .ok()
+        })
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false)
+}
+
+fn build_mobile_sync_status(connection: Option<MobileSyncConnection>) -> MobileSyncStatus {
+    let credential_stored = mobile_sync_credential_stored(connection.as_ref());
+    MobileSyncStatus {
+        base_url_configured: mobile_sync_base_url().is_ok(),
+        credential_stored,
+        is_linked: connection.is_some(),
+        connection,
+    }
+}
+
+fn validate_mobile_sync_snapshot(snapshot: &MobileSyncSnapshot) -> Result<(), String> {
+    if snapshot.schema_version != MOBILE_SYNC_SCHEMA_VERSION {
+        return Err(format!(
+            "Unsupported mobile sync schema version: {}",
+            snapshot.schema_version
+        ));
+    }
+
+    for provider in &snapshot.providers {
+        if provider.provider_id.trim().is_empty() {
+            return Err("Mobile Sync snapshot contains an empty provider ID".to_string());
+        }
+        if provider.display_name.trim().is_empty() {
+            return Err(format!(
+                "Mobile Sync snapshot provider {} is missing displayName",
+                provider.provider_id
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn build_mobile_sync_http_client() -> Result<reqwest::blocking::Client, String> {
+    let mut builder = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_millis(MOBILE_SYNC_HTTP_TIMEOUT_MS))
+        .connect_timeout(std::time::Duration::from_millis(MOBILE_SYNC_HTTP_TIMEOUT_MS));
+
+    if let Some(resolved) = crate::config::get_resolved_proxy() {
+        builder = builder.proxy(resolved.proxy.clone());
+    }
+
+    builder
+        .build()
+        .map_err(|error| format!("failed to build Mobile Sync HTTP client: {}", error))
+}
+
+fn consume_pairing_code(
+    base_url: &str,
+    request: &ConsumePairingCodeRequest,
+) -> Result<ConsumePairingCodeResponse, String> {
+    let client = build_mobile_sync_http_client()?;
+    let response = client
+        .post(format!("{}/consumePairingCode", base_url))
+        .json(request)
+        .send()
+        .map_err(|error| format!("link request failed: {}", error))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().unwrap_or_default();
+        return Err(format!("link request failed: {} {}", status, body));
+    }
+
+    response
+        .json::<ConsumePairingCodeResponse>()
+        .map_err(|error| format!("invalid link response: {}", error))
+}
+
+fn upload_mobile_sync_snapshot(
+    base_url: &str,
+    upload_token: &str,
+    request: &UploadLatestSnapshotRequest,
+) -> Result<(), String> {
+    let client = build_mobile_sync_http_client()?;
+    let response = client
+        .post(format!("{}/uploadLatestSnapshot", base_url))
+        .bearer_auth(upload_token)
+        .json(request)
+        .send()
+        .map_err(|error| format!("snapshot upload failed: {}", error))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().unwrap_or_default();
+        return Err(format!("snapshot upload failed: {} {}", status, body));
+    }
+
+    Ok(())
 }

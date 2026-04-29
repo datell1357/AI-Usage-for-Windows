@@ -10,6 +10,7 @@ import { useSettingsPluginList } from "@/hooks/app/use-settings-plugin-list"
 import { useSettingsSystemActions } from "@/hooks/app/use-settings-system-actions"
 import { useSettingsTheme } from "@/hooks/app/use-settings-theme"
 import { useTrayIcon } from "@/hooks/app/use-tray-icon"
+import { useMobileSync } from "@/hooks/app/use-mobile-sync"
 import { track } from "@/lib/analytics"
 import { REFRESH_COOLDOWN_MS, savePluginSettings } from "@/lib/settings"
 import { type PluginContextAction } from "@/components/side-nav"
@@ -171,6 +172,19 @@ function App() {
     pluginsMeta,
   })
 
+  const {
+    mobileSyncStatus,
+    mobileSyncBusy,
+    mobileSyncError,
+    handleMobileSyncLink,
+    handleMobileSyncSyncNow,
+    handleMobileSyncUnlink,
+  } = useMobileSync({
+    pluginSettings,
+    pluginsMeta,
+    pluginStates,
+  })
+
   const { displayPlugins, navPlugins, selectedPlugin } = useAppPluginViews({
     activeView,
     setActiveView,
@@ -247,6 +261,12 @@ function App() {
         onResetTimerDisplayModeToggle: handleResetTimerDisplayModeToggle,
         onGlobalShortcutChange: handleGlobalShortcutChange,
         onStartOnLoginChange: handleStartOnLoginChange,
+        mobileSyncStatus,
+        mobileSyncBusy,
+        mobileSyncError,
+        onMobileSyncLink: handleMobileSyncLink,
+        onMobileSyncSyncNow: handleMobileSyncSyncNow,
+        onMobileSyncUnlink: handleMobileSyncUnlink,
       }}
     />
   )

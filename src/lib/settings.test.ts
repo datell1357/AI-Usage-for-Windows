@@ -104,7 +104,7 @@ describe("settings", () => {
     expect(result.disabled).toEqual(["cursor"])
   })
 
-  it("migrates default providers out of the disabled list", () => {
+  it("preserves stored disabled default providers", () => {
     const plugins: PluginMeta[] = [
       { id: "claude", name: "Claude", iconUrl: "", lines: [], primaryCandidates: [] },
       { id: "codex", name: "Codex", iconUrl: "", lines: [], primaryCandidates: [] },
@@ -118,7 +118,25 @@ describe("settings", () => {
       plugins
     )
 
-    expect(result.disabled).toEqual(["cursor"])
+    expect(result.disabled).toEqual(["gemini", "antigravity", "cursor"])
+  })
+
+  it("only auto-disables newly added non-default providers", () => {
+    const plugins: PluginMeta[] = [
+      { id: "claude", name: "Claude", iconUrl: "", lines: [], primaryCandidates: [] },
+      { id: "codex", name: "Codex", iconUrl: "", lines: [], primaryCandidates: [] },
+      { id: "gemini", name: "Gemini", iconUrl: "", lines: [], primaryCandidates: [] },
+      { id: "antigravity", name: "Antigravity", iconUrl: "", lines: [], primaryCandidates: [] },
+      { id: "cursor", name: "Cursor", iconUrl: "", lines: [], primaryCandidates: [] },
+    ]
+
+    const result = normalizePluginSettings(
+      { order: ["claude", "codex", "gemini", "antigravity"], disabled: ["gemini"] },
+      plugins
+    )
+
+    expect(result.order).toEqual(["claude", "codex", "gemini", "antigravity", "cursor"])
+    expect(result.disabled).toEqual(["gemini", "cursor"])
   })
 
   it("compares settings equality", () => {

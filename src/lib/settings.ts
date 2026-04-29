@@ -152,9 +152,10 @@ export function normalizePluginSettings(
     }
   }
 
-  const disabled = settings.disabled.filter(
-    (id) => knownSet.has(id) && !DEFAULT_ENABLED_PLUGINS.has(id)
+  const storedDisabled = new Set(
+    settings.disabled.filter((id) => knownSet.has(id))
   );
+  const disabled = order.filter((id) => storedDisabled.has(id));
   for (const id of newlyAdded) {
     if (!DEFAULT_ENABLED_PLUGINS.has(id) && !disabled.includes(id)) {
       disabled.push(id);

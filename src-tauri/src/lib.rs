@@ -94,6 +94,14 @@ struct UploadLatestSnapshotRequest {
     snapshot: MobileSyncSnapshot,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RuntimeInfo {
+    is_packaged_windows_app: bool,
+    supports_updater: bool,
+    supports_autostart: bool,
+}
+
 #[cfg(desktop)]
 fn managed_shortcut_slot() -> &'static Mutex<Option<String>> {
     static SLOT: OnceLock<Mutex<Option<String>>> = OnceLock::new();
@@ -200,6 +208,16 @@ fn open_devtools(#[allow(unused)] app_handle: tauri::AppHandle) {
         if let Some(window) = app_handle.get_webview_window("main") {
             window.open_devtools();
         }
+    }
+}
+
+#[tauri::command]
+fn get_runtime_info() -> RuntimeInfo {
+    let is_packaged_windows_app = is_windows_packaged_process();
+    RuntimeInfo {
+        is_packaged_windows_app,
+        supports_updater: !is_packaged_windows_app,
+        supports_autostart: !is_packaged_windows_app,
     }
 }
 
@@ -612,33 +630,44 @@ pub fn run() {
     let runtime = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
     let _guard = runtime.enter();
 
-    let builder = tauri::Builder::default()
+    let packaged_windows_app = is_windows_packaged_process();
+
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::default().build());
 
-    builder
-        .plugin(
-            tauri_plugin_log::Builder::new()
-                .targets([
-                    Target::new(TargetKind::Stdout),
-                    Target::new(TargetKind::LogDir { file_name: None }),
-                ])
-                .max_file_size(10_000_000) // 10 MB
-                .level(log::LevelFilter::Trace) // Allow all levels; runtime filter via tray menu
-                .level_for("hyper", log::LevelFilter::Warn)
-                .level_for("reqwest", log::LevelFilter::Warn)
-                .level_for("tao", log::LevelFilter::Info)
-                .level_for("tauri_plugin_updater", log::LevelFilter::Info)
-                .build(),
-        )
+    builder = builder.plugin(
+        tauri_plugin_log::Builder::new()
+            .targets([
+                Target::new(TargetKind::Stdout),
+                Target::new(TargetKind::LogDir { file_name: None }),
+            ])
+            .max_file_size(10_000_000) // 10 MB
+            .level(log::LevelFilter::Trace) // Allow all levels; runtime filter via tray menu
+            .level_for("hyper", log::LevelFilter::Warn)
+            .level_for("reqwest", log::LevelFilter::Warn)
+            .level_for("tao", log::LevelFilter::Info)
+            .level_for("tauri_plugin_updater", log::LevelFilter::Info)
+            .build(),
+    );
+
+    builder = builder
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .plugin(tauri_plugin_autostart::Builder::new().build())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build());
+
+    if packaged_windows_app {
+        log::info!("packaged Windows runtime detected; startup updater/autostart disabled");
+    } else {
+        builder = builder.plugin(tauri_plugin_autostart::Builder::new().build());
+    }
+
+    builder
         .invoke_handler(tauri::generate_handler![
             init_panel,
             hide_panel,
             position_panel,
             open_devtools,
+            get_runtime_info,
             start_probe_batch,
             list_plugins,
             get_log_path,
@@ -688,11 +717,11 @@ pub fn run() {
             }
 
             tray::create(app.handle())?;
-            #[cfg(target_os = "windows")]
-            panel_windows::show_panel(app.handle());
 
-            app.handle()
-                .plugin(tauri_plugin_updater::Builder::new().build())?;
+            if !is_windows_packaged_process() {
+                app.handle()
+                    .plugin(tauri_plugin_updater::Builder::new().build())?;
+            }
 
             // Register global shortcut from stored settings
             #[cfg(desktop)]
@@ -733,13 +762,41 @@ pub fn run() {
         .run(|_, _| {});
 }
 
+fn is_windows_packaged_process() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        std::env::current_exe()
+            .ok()
+            .map(|path| {
+                path.components().any(|component| {
+                    component
+                        .as_os_str()
+                        .to_str()
+                        .map(|value| value.eq_ignore_ascii_case("WindowsApps"))
+                        .unwrap_or(false)
+                })
+            })
+            .unwrap_or(false)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        false
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::GLOBAL_SHORTCUT_STORE_KEY;
+    use super::{GLOBAL_SHORTCUT_STORE_KEY, is_windows_packaged_process};
 
     #[test]
     fn global_shortcut_store_key_is_stable() {
         assert_eq!(GLOBAL_SHORTCUT_STORE_KEY, "globalShortcut");
+    }
+
+    #[test]
+    fn packaged_windows_detection_is_false_in_non_packaged_tests() {
+        assert!(!is_windows_packaged_process());
     }
 }
 

@@ -4,6 +4,7 @@ import { ProviderDetailPage } from "@/pages/provider-detail"
 import { SettingsPage } from "@/pages/settings"
 import type { DisplayPluginState } from "@/hooks/app/use-app-plugin-views"
 import type { SettingsPluginState } from "@/hooks/app/use-settings-plugin-list"
+import type { MobileSyncStatus } from "@/lib/mobile-sync"
 import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 import { useAppUiStore } from "@/stores/app-ui-store"
 import type {
@@ -31,6 +32,12 @@ export type AppContentActionProps = {
   onResetTimerDisplayModeToggle: () => void
   onGlobalShortcutChange: (value: GlobalShortcut) => void
   onStartOnLoginChange: (value: boolean) => void
+  mobileSyncStatus: MobileSyncStatus | null
+  mobileSyncBusy: boolean
+  mobileSyncError: string | null
+  onMobileSyncLink: (code: string, deviceName: string) => Promise<void> | void
+  onMobileSyncSyncNow: () => Promise<void> | void
+  onMobileSyncUnlink: () => Promise<void> | void
 }
 
 export type AppContentProps = AppContentDerivedProps & AppContentActionProps
@@ -49,6 +56,12 @@ export function AppContent({
   onResetTimerDisplayModeToggle,
   onGlobalShortcutChange,
   onStartOnLoginChange,
+  mobileSyncStatus,
+  mobileSyncBusy,
+  mobileSyncError,
+  onMobileSyncLink,
+  onMobileSyncSyncNow,
+  onMobileSyncUnlink,
 }: AppContentProps) {
   const { activeView } = useAppUiStore(
     useShallow((state) => ({
@@ -104,6 +117,12 @@ export function AppContent({
         onGlobalShortcutChange={onGlobalShortcutChange}
         startOnLogin={startOnLogin}
         onStartOnLoginChange={onStartOnLoginChange}
+        mobileSyncStatus={mobileSyncStatus}
+        mobileSyncBusy={mobileSyncBusy}
+        mobileSyncError={mobileSyncError}
+        onMobileSyncLink={onMobileSyncLink}
+        onMobileSyncSyncNow={onMobileSyncSyncNow}
+        onMobileSyncUnlink={onMobileSyncUnlink}
       />
     )
   }

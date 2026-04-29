@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.2.0 - 2026-04-29
+
+### Added
+
+- Windows-side Mobile Sync foundation for AI Usage for Mobile
+- Mobile Sync settings section with pairing, manual sync, and unlink controls
+- Secure Mobile Sync upload token storage in Windows Credential Manager
+- Snapshot normalization from current Windows provider state for mobile upload
+
+### Fixed
+
+- Plugin enabled/disabled settings now persist across app restarts instead of re-enabling default providers during bootstrap
+
 ## v0.1.0 - 2026-04-27
 
 Initial Windows release of AI Usage.

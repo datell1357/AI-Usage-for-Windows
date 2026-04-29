@@ -97,7 +97,10 @@ fn windows_credential_target_name(service: &str, account: Option<&str>) -> Strin
     }
 }
 
-fn read_keychain_generic_password(service: &str, account: Option<&str>) -> Result<String, String> {
+pub(crate) fn read_keychain_generic_password(
+    service: &str,
+    account: Option<&str>,
+) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
         read_windows_generic_credential(service, account)
@@ -111,7 +114,7 @@ fn read_keychain_generic_password(service: &str, account: Option<&str>) -> Resul
     }
 }
 
-fn write_keychain_generic_password(
+pub(crate) fn write_keychain_generic_password(
     service: &str,
     account: Option<&str>,
     value: &str,
@@ -125,6 +128,23 @@ fn write_keychain_generic_password(
     #[cfg(not(target_os = "windows"))]
     {
         let _ = (service, account, value);
+        Err("keychain API is only supported on Windows".to_string())
+    }
+}
+
+pub(crate) fn delete_keychain_generic_password(
+    service: &str,
+    account: Option<&str>,
+) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        delete_windows_generic_credential(service, account)
+            .map_err(|error| format!("credential delete failed: {}", error))
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (service, account);
         Err("keychain API is only supported on Windows".to_string())
     }
 }
@@ -216,6 +236,19 @@ fn write_windows_generic_credential(
         return Err(windows_last_error_message());
     }
 
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn delete_windows_generic_credential(service: &str, account: Option<&str>) -> Result<(), String> {
+    use windows_sys::Win32::Security::Credentials::{CRED_TYPE_GENERIC, CredDeleteW};
+
+    let target = windows_credential_target_name(service, account);
+    let target_w = windows_wide_null(&target);
+    let ok = unsafe { CredDeleteW(target_w.as_ptr(), CRED_TYPE_GENERIC, 0) };
+    if ok == 0 {
+        return Err(windows_last_error_message());
+    }
     Ok(())
 }
 

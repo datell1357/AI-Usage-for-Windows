@@ -16,9 +16,11 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
+import { useMemo, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { GlobalShortcutSection } from "@/components/global-shortcut-section";
+import type { MobileSyncStatus } from "@/lib/mobile-sync";
 import {
   AUTO_UPDATE_OPTIONS,
   DISPLAY_MODE_OPTIONS,
@@ -117,6 +119,12 @@ interface SettingsPageProps {
   onGlobalShortcutChange: (value: GlobalShortcut) => void;
   startOnLogin: boolean;
   onStartOnLoginChange: (value: boolean) => void;
+  mobileSyncStatus: MobileSyncStatus | null;
+  mobileSyncBusy: boolean;
+  mobileSyncError: string | null;
+  onMobileSyncLink: (code: string, deviceName: string) => Promise<void> | void;
+  onMobileSyncSyncNow: () => Promise<void> | void;
+  onMobileSyncUnlink: () => Promise<void> | void;
 }
 
 export function SettingsPage({
@@ -135,7 +143,15 @@ export function SettingsPage({
   onGlobalShortcutChange,
   startOnLogin,
   onStartOnLoginChange,
+  mobileSyncStatus,
+  mobileSyncBusy,
+  mobileSyncError,
+  onMobileSyncLink,
+  onMobileSyncSyncNow,
+  onMobileSyncUnlink,
 }: SettingsPageProps) {
+  const [mobileSyncCode, setMobileSyncCode] = useState("");
+  const [mobileSyncDeviceName, setMobileSyncDeviceName] = useState("");
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -153,6 +169,18 @@ export function SettingsPage({
       const next = arrayMove(plugins, oldIndex, newIndex);
       onReorder(next.map((item) => item.id));
     }
+  };
+
+  const linkDisabled = useMemo(() => {
+    const code = mobileSyncCode.replace(/\D/g, "");
+    return mobileSyncBusy || code.length !== 6;
+  }, [mobileSyncBusy, mobileSyncCode]);
+
+  const handleLinkClick = async () => {
+    const normalizedCode = mobileSyncCode.replace(/\D/g, "").slice(0, 6);
+    if (normalizedCode.length !== 6) return;
+    await onMobileSyncLink(normalizedCode, mobileSyncDeviceName.trim());
+    setMobileSyncCode("");
   };
 
   return (
@@ -296,6 +324,109 @@ export function SettingsPage({
           />
           Start on login
         </label>
+      </section>
+      <section>
+        <h3 className="text-lg font-semibold mb-0">Mobile Sync</h3>
+        <p className="text-sm text-muted-foreground mb-2">
+          Pair AI Usage for Windows with AI Usage for Mobile
+        </p>
+        <div className="rounded-lg border bg-muted/50 p-3 space-y-3">
+          {!mobileSyncStatus?.baseUrlConfigured && (
+            <p className="text-sm text-amber-600 dark:text-amber-400">
+              Mobile Sync backend URL is not configured on this Windows device.
+            </p>
+          )}
+
+          {mobileSyncStatus?.connection ? (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{mobileSyncStatus.connection.deviceName}</p>
+                <p className="text-xs text-muted-foreground">
+                  Device ID: {mobileSyncStatus.connection.deviceId}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Linked: {new Date(mobileSyncStatus.connection.linkedAt).toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Last upload: {mobileSyncStatus.connection.lastUploadedAt
+                    ? new Date(mobileSyncStatus.connection.lastUploadedAt).toLocaleString()
+                    : "Not uploaded yet"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Upload status: {mobileSyncStatus.connection.lastUploadStatus}
+                </p>
+                {!mobileSyncStatus.credentialStored && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Upload credential is missing. Relink this device before syncing again.
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => void onMobileSyncSyncNow()}
+                  disabled={
+                    mobileSyncBusy ||
+                    !mobileSyncStatus.baseUrlConfigured ||
+                    !mobileSyncStatus.credentialStored
+                  }
+                >
+                  {mobileSyncBusy ? "Syncing..." : "Sync Now"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void onMobileSyncUnlink()}
+                  disabled={mobileSyncBusy}
+                >
+                  Unlink
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <label className="block space-y-1">
+                  <span className="text-sm font-medium">6-digit pairing code</span>
+                  <input
+                    value={mobileSyncCode}
+                    onChange={(event) =>
+                      setMobileSyncCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                    }
+                    inputMode="numeric"
+                    placeholder="482193"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-sm font-medium">Device name</span>
+                  <input
+                    value={mobileSyncDeviceName}
+                    onChange={(event) => setMobileSyncDeviceName(event.target.value)}
+                    placeholder="Home PC"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                </label>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void handleLinkClick()}
+                disabled={linkDisabled || !mobileSyncStatus?.baseUrlConfigured}
+              >
+                {mobileSyncBusy ? "Linking..." : "Link Mobile App"}
+              </Button>
+            </div>
+          )}
+
+          {(mobileSyncError || mobileSyncStatus?.connection?.lastError) && (
+            <p className="text-sm text-destructive">
+              {mobileSyncError ?? mobileSyncStatus?.connection?.lastError}
+            </p>
+          )}
+        </div>
       </section>
       <section>
         <h3 className="text-lg font-semibold mb-0">Plugins</h3>

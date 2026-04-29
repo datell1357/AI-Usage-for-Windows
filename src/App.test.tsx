@@ -49,6 +49,10 @@ const updaterState = vi.hoisted(() => ({
   relaunchMock: vi.fn(async () => undefined),
 }))
 
+const runtimeInfoState = vi.hoisted(() => ({
+  loadRuntimeInfoMock: vi.fn(),
+}))
+
 const eventState = vi.hoisted(() => {
   const handlers = new Map<string, (event: any) => void>()
   return {
@@ -196,6 +200,10 @@ vi.mock("@tauri-apps/plugin-process", () => ({
   relaunch: updaterState.relaunchMock,
 }))
 
+vi.mock("@/lib/runtime-info", () => ({
+  loadRuntimeInfo: runtimeInfoState.loadRuntimeInfoMock,
+}))
+
 vi.mock("@tauri-apps/plugin-autostart", () => ({
   enable: state.autostartEnableMock,
   disable: state.autostartDisableMock,
@@ -289,6 +297,7 @@ describe("App", () => {
     state.autostartEnableMock.mockReset()
     state.autostartDisableMock.mockReset()
     state.autostartIsEnabledMock.mockReset()
+    runtimeInfoState.loadRuntimeInfoMock.mockReset()
     state.renderTrayBarsIconMock.mockReset()
     state.trayGetByIdMock.mockReset()
     state.traySetIconMock.mockReset()
@@ -309,6 +318,11 @@ describe("App", () => {
     updaterState.checkMock.mockReset()
     updaterState.relaunchMock.mockReset()
     updaterState.checkMock.mockResolvedValue(null)
+    runtimeInfoState.loadRuntimeInfoMock.mockResolvedValue({
+      isPackagedWindowsApp: false,
+      supportsUpdater: true,
+      supportsAutostart: true,
+    })
     state.savePluginSettingsMock.mockResolvedValue(undefined)
     state.saveAutoUpdateIntervalMock.mockResolvedValue(undefined)
     state.loadThemeModeMock.mockResolvedValue("system")

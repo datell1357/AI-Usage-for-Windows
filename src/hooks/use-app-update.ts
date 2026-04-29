@@ -3,6 +3,7 @@ import { isTauri } from "@tauri-apps/api/core"
 import { check, type Update } from "@tauri-apps/plugin-updater"
 import { relaunch } from "@tauri-apps/plugin-process"
 import { track } from "@/lib/analytics"
+import { loadRuntimeInfo } from "@/lib/runtime-info"
 
 export type UpdateStatus =
   | { status: "idle" }
@@ -35,6 +36,8 @@ export function useAppUpdate(): UseAppUpdateReturn {
 
   const checkForUpdates = useCallback(async () => {
     if (!isTauri()) return
+    const runtimeInfo = await loadRuntimeInfo()
+    if (!runtimeInfo.supportsUpdater) return
     if (inFlightRef.current.checking || inFlightRef.current.downloading || inFlightRef.current.installing) return
     if (statusRef.current.status === "ready") return
 

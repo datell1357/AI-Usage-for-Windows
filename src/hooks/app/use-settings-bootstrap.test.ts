@@ -9,6 +9,7 @@ const {
   invokeMock,
   isAutostartEnabledMock,
   isTauriMock,
+  loadRuntimeInfoMock,
   loadAutoUpdateIntervalMock,
   loadDisplayModeMock,
   loadGlobalShortcutMock,
@@ -23,6 +24,7 @@ const {
 } = vi.hoisted(() => ({
   invokeMock: vi.fn(),
   isTauriMock: vi.fn(),
+  loadRuntimeInfoMock: vi.fn(),
   isAutostartEnabledMock: vi.fn(),
   enableAutostartMock: vi.fn(),
   disableAutostartMock: vi.fn(),
@@ -50,6 +52,10 @@ vi.mock("@tauri-apps/plugin-autostart", () => ({
   disable: disableAutostartMock,
   enable: enableAutostartMock,
   isEnabled: isAutostartEnabledMock,
+}))
+
+vi.mock("@/lib/runtime-info", () => ({
+  loadRuntimeInfo: loadRuntimeInfoMock,
 }))
 
 vi.mock("@/lib/settings", () => ({
@@ -116,6 +122,11 @@ describe("useSettingsBootstrap", () => {
     savePluginSettingsMock.mockReset()
 
     isTauriMock.mockReturnValue(true)
+    loadRuntimeInfoMock.mockResolvedValue({
+      isPackagedWindowsApp: false,
+      supportsUpdater: true,
+      supportsAutostart: true,
+    })
     isAutostartEnabledMock.mockResolvedValue(true)
     invokeMock.mockResolvedValue([
       {
@@ -149,6 +160,22 @@ describe("useSettingsBootstrap", () => {
     await result.current.applyStartOnLogin(false)
 
     expect(disableAutostartMock).toHaveBeenCalledTimes(1)
+    expect(enableAutostartMock).not.toHaveBeenCalled()
+  })
+
+  it("skips autostart work when runtime does not support it", async () => {
+    loadRuntimeInfoMock.mockResolvedValueOnce({
+      isPackagedWindowsApp: true,
+      supportsUpdater: false,
+      supportsAutostart: false,
+    })
+    const args = createArgs()
+    const { result } = renderHook(() => useSettingsBootstrap(args))
+
+    await result.current.applyStartOnLogin(false)
+
+    expect(isAutostartEnabledMock).not.toHaveBeenCalled()
+    expect(disableAutostartMock).not.toHaveBeenCalled()
     expect(enableAutostartMock).not.toHaveBeenCalled()
   })
 

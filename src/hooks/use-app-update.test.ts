@@ -8,6 +8,9 @@ const { checkMock, relaunchMock } = vi.hoisted(() => ({
 const { trackMock } = vi.hoisted(() => ({
   trackMock: vi.fn(),
 }))
+const { loadRuntimeInfoMock } = vi.hoisted(() => ({
+  loadRuntimeInfoMock: vi.fn(),
+}))
 
 vi.mock("@tauri-apps/plugin-updater", () => ({
   check: checkMock,
@@ -19,6 +22,10 @@ vi.mock("@tauri-apps/plugin-process", () => ({
 
 vi.mock("@/lib/analytics", () => ({
   track: trackMock,
+}))
+
+vi.mock("@/lib/runtime-info", () => ({
+  loadRuntimeInfo: loadRuntimeInfoMock,
 }))
 
 import { useAppUpdate } from "@/hooks/use-app-update"
@@ -35,8 +42,14 @@ describe("useAppUpdate", () => {
     checkMock.mockReset()
     relaunchMock.mockReset()
     trackMock.mockReset()
+    loadRuntimeInfoMock.mockReset()
     // `@tauri-apps/api/core` considers `globalThis.isTauri` the runtime flag.
     globalThis.isTauri = true
+    loadRuntimeInfoMock.mockResolvedValue({
+      isPackagedWindowsApp: false,
+      supportsUpdater: true,
+      supportsAutostart: true,
+    })
   })
 
   afterAll(() => {
@@ -58,6 +71,21 @@ describe("useAppUpdate", () => {
     globalThis.isTauri = false
 
     const { result } = renderHook(() => useAppUpdate())
+    await act(() => Promise.resolve())
+
+    expect(checkMock).not.toHaveBeenCalled()
+    expect(result.current.updateStatus).toEqual({ status: "idle" })
+  })
+
+  it("stays idle when updater is unsupported in packaged runtime", async () => {
+    loadRuntimeInfoMock.mockResolvedValueOnce({
+      isPackagedWindowsApp: true,
+      supportsUpdater: false,
+      supportsAutostart: false,
+    })
+
+    const { result } = renderHook(() => useAppUpdate())
+    await act(() => Promise.resolve())
     await act(() => Promise.resolve())
 
     expect(checkMock).not.toHaveBeenCalled()

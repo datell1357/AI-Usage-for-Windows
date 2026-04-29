@@ -5,6 +5,7 @@ import {
   enable as enableAutostart,
   isEnabled as isAutostartEnabled,
 } from "@tauri-apps/plugin-autostart"
+import { loadRuntimeInfo } from "@/lib/runtime-info"
 import type { PluginMeta } from "@/lib/plugin-types"
 import {
   arePluginSettingsEqual,
@@ -67,6 +68,8 @@ export function useSettingsBootstrap({
 }: UseSettingsBootstrapArgs) {
   const applyStartOnLogin = useCallback(async (value: boolean) => {
     if (!isTauri()) return
+    const runtimeInfo = await loadRuntimeInfo()
+    if (!runtimeInfo.supportsAutostart) return
     const currentlyEnabled = await isAutostartEnabled()
     if (currentlyEnabled === value) return
 

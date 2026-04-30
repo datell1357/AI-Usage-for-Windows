@@ -27,6 +27,10 @@ const state = vi.hoisted(() => ({
   saveGlobalShortcutMock: vi.fn(),
   loadStartOnLoginMock: vi.fn(),
   saveStartOnLoginMock: vi.fn(),
+  loadMobileSyncDeviceIdMock: vi.fn(),
+  saveMobileSyncDeviceIdMock: vi.fn(),
+  loadMobileSyncDeviceNameMock: vi.fn(),
+  saveMobileSyncDeviceNameMock: vi.fn(),
   autostartEnableMock: vi.fn(),
   autostartDisableMock: vi.fn(),
   autostartIsEnabledMock: vi.fn(),
@@ -51,6 +55,14 @@ const updaterState = vi.hoisted(() => ({
 
 const runtimeInfoState = vi.hoisted(() => ({
   loadRuntimeInfoMock: vi.fn(),
+}))
+
+const firebaseState = vi.hoisted(() => ({
+  getFirebaseRuntimeStateMock: vi.fn(),
+  watchFirebaseUserMock: vi.fn(),
+  signInWithGoogleMock: vi.fn(),
+  signInWithGithubMock: vi.fn(),
+  signOutFirebaseMock: vi.fn(),
 }))
 
 const eventState = vi.hoisted(() => {
@@ -204,6 +216,15 @@ vi.mock("@/lib/runtime-info", () => ({
   loadRuntimeInfo: runtimeInfoState.loadRuntimeInfoMock,
 }))
 
+vi.mock("@/lib/firebase", () => ({
+  getFirebaseRuntimeState: firebaseState.getFirebaseRuntimeStateMock,
+  watchFirebaseUser: firebaseState.watchFirebaseUserMock,
+  signInWithGoogle: firebaseState.signInWithGoogleMock,
+  signInWithGithub: firebaseState.signInWithGithubMock,
+  signOutFirebase: firebaseState.signOutFirebaseMock,
+  getFirebaseServices: vi.fn(() => null),
+}))
+
 vi.mock("@tauri-apps/plugin-autostart", () => ({
   enable: state.autostartEnableMock,
   disable: state.autostartDisableMock,
@@ -247,6 +268,10 @@ vi.mock("@/lib/settings", async () => {
     saveGlobalShortcut: state.saveGlobalShortcutMock,
     loadStartOnLogin: state.loadStartOnLoginMock,
     saveStartOnLogin: state.saveStartOnLoginMock,
+    loadMobileSyncDeviceId: state.loadMobileSyncDeviceIdMock,
+    saveMobileSyncDeviceId: state.saveMobileSyncDeviceIdMock,
+    loadMobileSyncDeviceName: state.loadMobileSyncDeviceNameMock,
+    saveMobileSyncDeviceName: state.saveMobileSyncDeviceNameMock,
   }
 })
 
@@ -294,10 +319,19 @@ describe("App", () => {
     state.saveGlobalShortcutMock.mockReset()
     state.loadStartOnLoginMock.mockReset()
     state.saveStartOnLoginMock.mockReset()
+    state.loadMobileSyncDeviceIdMock.mockReset()
+    state.saveMobileSyncDeviceIdMock.mockReset()
+    state.loadMobileSyncDeviceNameMock.mockReset()
+    state.saveMobileSyncDeviceNameMock.mockReset()
     state.autostartEnableMock.mockReset()
     state.autostartDisableMock.mockReset()
     state.autostartIsEnabledMock.mockReset()
     runtimeInfoState.loadRuntimeInfoMock.mockReset()
+    firebaseState.getFirebaseRuntimeStateMock.mockReset()
+    firebaseState.watchFirebaseUserMock.mockReset()
+    firebaseState.signInWithGoogleMock.mockReset()
+    firebaseState.signInWithGithubMock.mockReset()
+    firebaseState.signOutFirebaseMock.mockReset()
     state.renderTrayBarsIconMock.mockReset()
     state.trayGetByIdMock.mockReset()
     state.traySetIconMock.mockReset()
@@ -323,6 +357,14 @@ describe("App", () => {
       supportsUpdater: true,
       supportsAutostart: true,
     })
+    firebaseState.getFirebaseRuntimeStateMock.mockReturnValue({
+      enabled: true,
+      missingKeys: [],
+    })
+    firebaseState.watchFirebaseUserMock.mockImplementation(() => () => undefined)
+    firebaseState.signInWithGoogleMock.mockResolvedValue(undefined)
+    firebaseState.signInWithGithubMock.mockResolvedValue(undefined)
+    firebaseState.signOutFirebaseMock.mockResolvedValue(undefined)
     state.savePluginSettingsMock.mockResolvedValue(undefined)
     state.saveAutoUpdateIntervalMock.mockResolvedValue(undefined)
     state.loadThemeModeMock.mockResolvedValue("system")
@@ -338,6 +380,10 @@ describe("App", () => {
     state.saveGlobalShortcutMock.mockResolvedValue(undefined)
     state.loadStartOnLoginMock.mockResolvedValue(false)
     state.saveStartOnLoginMock.mockResolvedValue(undefined)
+    state.loadMobileSyncDeviceIdMock.mockResolvedValue(null)
+    state.saveMobileSyncDeviceIdMock.mockResolvedValue(undefined)
+    state.loadMobileSyncDeviceNameMock.mockResolvedValue("Windows PC")
+    state.saveMobileSyncDeviceNameMock.mockResolvedValue(undefined)
     state.autostartEnableMock.mockResolvedValue(undefined)
     state.autostartDisableMock.mockResolvedValue(undefined)
     state.autostartIsEnabledMock.mockResolvedValue(false)

@@ -4,6 +4,7 @@ import {
   DEFAULT_DISPLAY_MODE,
   DEFAULT_GLOBAL_SHORTCUT,
   DEFAULT_MENUBAR_ICON_STYLE,
+  DEFAULT_MOBILE_SYNC_DEVICE_NAME,
   DEFAULT_PLUGIN_SETTINGS,
   DEFAULT_RESET_TIMER_DISPLAY_MODE,
   DEFAULT_START_ON_LOGIN,
@@ -19,6 +20,8 @@ import {
   loadStartOnLogin,
   migrateLegacyTraySettings,
   loadThemeMode,
+  loadMobileSyncDeviceId,
+  loadMobileSyncDeviceName,
   normalizePluginSettings,
   saveAutoUpdateInterval,
   saveDisplayMode,
@@ -28,6 +31,8 @@ import {
   saveResetTimerDisplayMode,
   saveStartOnLogin,
   saveThemeMode,
+  saveMobileSyncDeviceId,
+  saveMobileSyncDeviceName,
 } from "@/lib/settings"
 import type { PluginMeta } from "@/lib/plugin-types"
 
@@ -375,5 +380,22 @@ describe("settings", () => {
   it("falls back to default for invalid start on login value", async () => {
     storeState.set("startOnLogin", "invalid")
     await expect(loadStartOnLogin()).resolves.toBe(DEFAULT_START_ON_LOGIN)
+  })
+
+  it("loads, saves, and defaults mobile sync device id", async () => {
+    await expect(loadMobileSyncDeviceId()).resolves.toBeNull()
+
+    await saveMobileSyncDeviceId("dev_test")
+    await expect(loadMobileSyncDeviceId()).resolves.toBe("dev_test")
+  })
+
+  it("loads, trims, and defaults mobile sync device name", async () => {
+    await expect(loadMobileSyncDeviceName()).resolves.toBe(DEFAULT_MOBILE_SYNC_DEVICE_NAME)
+
+    await saveMobileSyncDeviceName("  Home PC  ")
+    await expect(loadMobileSyncDeviceName()).resolves.toBe("Home PC")
+
+    await saveMobileSyncDeviceName("   ")
+    await expect(loadMobileSyncDeviceName()).resolves.toBe(DEFAULT_MOBILE_SYNC_DEVICE_NAME)
   })
 })

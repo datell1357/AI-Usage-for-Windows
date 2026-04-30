@@ -61,16 +61,26 @@ const defaultProps = {
   startOnLogin: false,
   onStartOnLoginChange: vi.fn(),
   mobileSyncStatus: {
-    baseUrlConfigured: true,
-    credentialStored: false,
-    isLinked: false,
-    connection: null,
+    isConfigured: true,
+    missingConfigKeys: [],
+    isAuthenticated: false,
+    account: null,
+    deviceId: "dev_test",
+    deviceName: "Windows PC",
+    syncEnabled: true,
+    linkedAt: null,
+    lastSeenAt: null,
+    lastUploadedAt: null,
+    lastUploadStatus: "idle" as const,
+    lastError: null,
   },
   mobileSyncBusy: false,
   mobileSyncError: null,
-  onMobileSyncLink: vi.fn(),
+  onMobileSyncGoogleSignIn: vi.fn(),
+  onMobileSyncGithubSignIn: vi.fn(),
   onMobileSyncSyncNow: vi.fn(),
-  onMobileSyncUnlink: vi.fn(),
+  onMobileSyncSignOut: vi.fn(),
+  onMobileSyncSaveDeviceName: vi.fn(),
 }
 
 afterEach(() => {
@@ -220,10 +230,37 @@ describe("SettingsPage", () => {
     expect(onStartOnLoginChange).toHaveBeenCalledWith(true)
   })
 
-  it("renders mobile sync pairing controls when no device is linked", () => {
+  it("renders mobile sync sign-in controls when no account is linked", () => {
     render(<SettingsPage {...defaultProps} />)
     expect(screen.getByText("Mobile Sync")).toBeInTheDocument()
-    expect(screen.getByText("6-digit pairing code")).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Link Mobile App" })).toBeInTheDocument()
+    expect(screen.getByText(/Sign in with the same Firebase account used on Android/i)).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Sign In with Google" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Sign In with GitHub" })).toBeInTheDocument()
+  })
+
+  it("renders device sync controls when signed in", () => {
+    render(
+      <SettingsPage
+        {...defaultProps}
+        mobileSyncStatus={{
+          ...defaultProps.mobileSyncStatus,
+          isAuthenticated: true,
+          account: {
+            uid: "uid_123",
+            email: "user@example.com",
+            displayName: "User",
+            photoURL: null,
+            providerIds: ["google.com"],
+          },
+          linkedAt: "2026-04-30T00:00:00.000Z",
+          lastUploadedAt: "2026-04-30T00:05:00.000Z",
+        }}
+      />
+    )
+
+    expect(screen.getByDisplayValue("Windows PC")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Save Device Name" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Sync Now" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Sign Out" })).toBeInTheDocument()
   })
 })

@@ -35,9 +35,11 @@ export type AppContentActionProps = {
   mobileSyncStatus: MobileSyncStatus | null
   mobileSyncBusy: boolean
   mobileSyncError: string | null
-  onMobileSyncLink: (code: string, deviceName: string) => Promise<void> | void
+  onMobileSyncGoogleSignIn: () => Promise<void> | void
+  onMobileSyncGithubSignIn: () => Promise<void> | void
   onMobileSyncSyncNow: () => Promise<void> | void
-  onMobileSyncUnlink: () => Promise<void> | void
+  onMobileSyncSignOut: () => Promise<void> | void
+  onMobileSyncSaveDeviceName: (deviceName: string) => Promise<void> | void
 }
 
 export type AppContentProps = AppContentDerivedProps & AppContentActionProps
@@ -59,9 +61,11 @@ export function AppContent({
   mobileSyncStatus,
   mobileSyncBusy,
   mobileSyncError,
-  onMobileSyncLink,
+  onMobileSyncGoogleSignIn,
+  onMobileSyncGithubSignIn,
   onMobileSyncSyncNow,
-  onMobileSyncUnlink,
+  onMobileSyncSignOut,
+  onMobileSyncSaveDeviceName,
 }: AppContentProps) {
   const { activeView } = useAppUiStore(
     useShallow((state) => ({
@@ -120,9 +124,11 @@ export function AppContent({
         mobileSyncStatus={mobileSyncStatus}
         mobileSyncBusy={mobileSyncBusy}
         mobileSyncError={mobileSyncError}
-        onMobileSyncLink={onMobileSyncLink}
+        onMobileSyncGoogleSignIn={onMobileSyncGoogleSignIn}
+        onMobileSyncGithubSignIn={onMobileSyncGithubSignIn}
         onMobileSyncSyncNow={onMobileSyncSyncNow}
-        onMobileSyncUnlink={onMobileSyncUnlink}
+        onMobileSyncSignOut={onMobileSyncSignOut}
+        onMobileSyncSaveDeviceName={onMobileSyncSaveDeviceName}
       />
     )
   }

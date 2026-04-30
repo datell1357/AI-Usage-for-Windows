@@ -21,6 +21,7 @@ describe("mobile sync snapshot builder", () => {
     })
 
     expect(snapshot.schemaVersion).toBe(MOBILE_SYNC_SCHEMA_VERSION)
+    expect(typeof snapshot.fetchedAt).toBe("string")
     expect(snapshot.providers.map((provider) => provider.providerId)).toEqual([
       "codex",
       "claude",
@@ -70,16 +71,42 @@ describe("mobile sync snapshot builder", () => {
     expect(snapshot.providers[1]).toMatchObject({
       providerId: "codex",
       status: "error",
-      error: "Failed to start probe",
+      error: "Provider refresh failed",
     })
     expect(snapshot.providers[2]).toMatchObject({
       providerId: "cursor",
       status: "ok",
       plan: "Pro",
     })
-    expect(snapshot.providers[2]?.refreshedAt).toBe(
-      new Date(1_746_000_000_000).toISOString()
-    )
+    expect(snapshot.providers[2]?.fetchedAt).toBe(new Date(1_746_000_000_000).toISOString())
+  })
+
+  it("renames per-provider refresh timestamps to fetchedAt", () => {
+    const pluginStates: Record<string, PluginState> = {
+      cursor: {
+        data: {
+          providerId: "cursor",
+          displayName: "Cursor",
+          plan: "Pro",
+          iconUrl: "/cursor.svg",
+          lines: [{ type: "badge", label: "Plan", text: "Pro" }],
+        },
+        loading: false,
+        error: null,
+        lastManualRefreshAt: 1_746_000_000_000,
+      },
+    }
+
+    const snapshot = buildMobileSyncSnapshot({
+      pluginSettings: {
+        order: ["cursor"],
+        disabled: [],
+      },
+      pluginsMeta,
+      pluginStates,
+    })
+
+    expect(snapshot.providers[0]?.fetchedAt).toBe(new Date(1_746_000_000_000).toISOString())
   })
 
   it("returns an empty payload before plugin settings bootstrap completes", () => {
@@ -90,5 +117,45 @@ describe("mobile sync snapshot builder", () => {
     })
 
     expect(snapshot.providers).toEqual([])
+  })
+
+  it("sanitizes text fields that look like secrets or local paths", () => {
+    const pluginStates: Record<string, PluginState> = {
+      claude: {
+        data: {
+          providerId: "claude",
+          displayName: "Claude",
+          plan: "api key: abc123",
+          iconUrl: "/claude.svg",
+          lines: [
+            { type: "text", label: "Path", value: "C:\\Users\\datell\\secret.txt" },
+            { type: "badge", label: "Token", text: "Bearer abcdef" },
+          ],
+        },
+        loading: false,
+        error: "full raw error log",
+        lastManualRefreshAt: null,
+      },
+    }
+
+    const snapshot = buildMobileSyncSnapshot({
+      pluginSettings: {
+        order: ["claude"],
+        disabled: [],
+      },
+      pluginsMeta,
+      pluginStates,
+    })
+
+    expect(snapshot.providers[0]?.plan).toBe("[redacted]")
+    expect(snapshot.providers[0]?.lines[0]).toMatchObject({
+      type: "text",
+      value: "[redacted]",
+    })
+    expect(snapshot.providers[0]?.lines[1]).toMatchObject({
+      type: "badge",
+      text: "[redacted]",
+    })
+    expect(snapshot.providers[0]?.error).toBe("Provider refresh failed")
   })
 })

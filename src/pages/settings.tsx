@@ -16,7 +16,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { GlobalShortcutSection } from "@/components/global-shortcut-section";
@@ -122,9 +122,11 @@ interface SettingsPageProps {
   mobileSyncStatus: MobileSyncStatus | null;
   mobileSyncBusy: boolean;
   mobileSyncError: string | null;
-  onMobileSyncLink: (code: string, deviceName: string) => Promise<void> | void;
+  onMobileSyncGoogleSignIn: () => Promise<void> | void;
+  onMobileSyncGithubSignIn: () => Promise<void> | void;
   onMobileSyncSyncNow: () => Promise<void> | void;
-  onMobileSyncUnlink: () => Promise<void> | void;
+  onMobileSyncSignOut: () => Promise<void> | void;
+  onMobileSyncSaveDeviceName: (deviceName: string) => Promise<void> | void;
 }
 
 export function SettingsPage({
@@ -146,12 +148,15 @@ export function SettingsPage({
   mobileSyncStatus,
   mobileSyncBusy,
   mobileSyncError,
-  onMobileSyncLink,
+  onMobileSyncGoogleSignIn,
+  onMobileSyncGithubSignIn,
   onMobileSyncSyncNow,
-  onMobileSyncUnlink,
+  onMobileSyncSignOut,
+  onMobileSyncSaveDeviceName,
 }: SettingsPageProps) {
-  const [mobileSyncCode, setMobileSyncCode] = useState("");
-  const [mobileSyncDeviceName, setMobileSyncDeviceName] = useState("");
+  const [mobileSyncDeviceNameDraft, setMobileSyncDeviceNameDraft] = useState(
+    mobileSyncStatus?.deviceName ?? ""
+  );
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -171,17 +176,18 @@ export function SettingsPage({
     }
   };
 
-  const linkDisabled = useMemo(() => {
-    const code = mobileSyncCode.replace(/\D/g, "");
-    return mobileSyncBusy || code.length !== 6;
-  }, [mobileSyncBusy, mobileSyncCode]);
+  useEffect(() => {
+    setMobileSyncDeviceNameDraft(mobileSyncStatus?.deviceName ?? "");
+  }, [mobileSyncStatus?.deviceName]);
 
-  const handleLinkClick = async () => {
-    const normalizedCode = mobileSyncCode.replace(/\D/g, "").slice(0, 6);
-    if (normalizedCode.length !== 6) return;
-    await onMobileSyncLink(normalizedCode, mobileSyncDeviceName.trim());
-    setMobileSyncCode("");
-  };
+  const deviceNameSaveDisabled = useMemo(() => {
+    if (!mobileSyncStatus?.isAuthenticated) return true;
+    return (
+      mobileSyncBusy ||
+      mobileSyncDeviceNameDraft.trim().length === 0 ||
+      mobileSyncDeviceNameDraft.trim() === mobileSyncStatus.deviceName
+    );
+  }, [mobileSyncBusy, mobileSyncDeviceNameDraft, mobileSyncStatus]);
 
   return (
     <div className="py-3 space-y-4">
@@ -328,49 +334,74 @@ export function SettingsPage({
       <section>
         <h3 className="text-lg font-semibold mb-0">Mobile Sync</h3>
         <p className="text-sm text-muted-foreground mb-2">
-          Pair AI Usage for Windows with AI Usage for Mobile
+          Sync this Windows device directly to Firebase for the mobile app
         </p>
         <div className="rounded-lg border bg-muted/50 p-3 space-y-3">
-          {!mobileSyncStatus?.baseUrlConfigured && (
-            <p className="text-sm text-amber-600 dark:text-amber-400">
-              Mobile Sync backend URL is not configured on this Windows device.
-            </p>
+          {!mobileSyncStatus?.isConfigured && (
+            <div className="space-y-1">
+              <p className="text-sm text-amber-600 dark:text-amber-400">
+                Firebase is not configured on this Windows device.
+              </p>
+              {mobileSyncStatus?.missingConfigKeys?.length ? (
+                <p className="text-xs text-muted-foreground">
+                  Missing: {mobileSyncStatus.missingConfigKeys.join(", ")}
+                </p>
+              ) : null}
+            </div>
           )}
 
-          {mobileSyncStatus?.connection ? (
+          {mobileSyncStatus?.isAuthenticated ? (
             <div className="space-y-3">
               <div className="space-y-1">
-                <p className="text-sm font-medium">{mobileSyncStatus.connection.deviceName}</p>
-                <p className="text-xs text-muted-foreground">
-                  Device ID: {mobileSyncStatus.connection.deviceId}
+                <p className="text-sm font-medium">
+                  {mobileSyncStatus.account?.displayName ?? mobileSyncStatus.account?.email ?? "Signed in"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Linked: {new Date(mobileSyncStatus.connection.linkedAt).toLocaleString()}
+                  Firebase account: {mobileSyncStatus.account?.email ?? mobileSyncStatus.account?.uid}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Last upload: {mobileSyncStatus.connection.lastUploadedAt
-                    ? new Date(mobileSyncStatus.connection.lastUploadedAt).toLocaleString()
+                  Device ID: {mobileSyncStatus.deviceId ?? "Not assigned yet"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Linked: {mobileSyncStatus.linkedAt
+                    ? new Date(mobileSyncStatus.linkedAt).toLocaleString()
+                    : "Not linked yet"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Last sync: {mobileSyncStatus.lastUploadedAt
+                    ? new Date(mobileSyncStatus.lastUploadedAt).toLocaleString()
                     : "Not uploaded yet"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Upload status: {mobileSyncStatus.connection.lastUploadStatus}
+                  Sync status: {mobileSyncStatus.syncEnabled ? mobileSyncStatus.lastUploadStatus : "disabled"}
                 </p>
-                {!mobileSyncStatus.credentialStored && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400">
-                    Upload credential is missing. Relink this device before syncing again.
-                  </p>
-                )}
+              </div>
+              <div className="space-y-2">
+                <label className="block space-y-1">
+                  <span className="text-sm font-medium">Device Name</span>
+                  <input
+                    value={mobileSyncDeviceNameDraft}
+                    onChange={(event) => setMobileSyncDeviceNameDraft(event.target.value)}
+                    placeholder="Windows PC"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                </label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void onMobileSyncSaveDeviceName(mobileSyncDeviceNameDraft)}
+                  disabled={deviceNameSaveDisabled}
+                >
+                  {mobileSyncBusy ? "Saving..." : "Save Device Name"}
+                </Button>
               </div>
               <div className="flex gap-2">
                 <Button
                   type="button"
                   size="sm"
                   onClick={() => void onMobileSyncSyncNow()}
-                  disabled={
-                    mobileSyncBusy ||
-                    !mobileSyncStatus.baseUrlConfigured ||
-                    !mobileSyncStatus.credentialStored
-                  }
+                  disabled={mobileSyncBusy || !mobileSyncStatus.syncEnabled}
                 >
                   {mobileSyncBusy ? "Syncing..." : "Sync Now"}
                 </Button>
@@ -378,52 +409,44 @@ export function SettingsPage({
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => void onMobileSyncUnlink()}
+                  onClick={() => void onMobileSyncSignOut()}
                   disabled={mobileSyncBusy}
                 >
-                  Unlink
+                  Sign Out
                 </Button>
               </div>
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="space-y-2">
-                <label className="block space-y-1">
-                  <span className="text-sm font-medium">6-digit pairing code</span>
-                  <input
-                    value={mobileSyncCode}
-                    onChange={(event) =>
-                      setMobileSyncCode(event.target.value.replace(/\D/g, "").slice(0, 6))
-                    }
-                    inputMode="numeric"
-                    placeholder="482193"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  />
-                </label>
-                <label className="block space-y-1">
-                  <span className="text-sm font-medium">Device name</span>
-                  <input
-                    value={mobileSyncDeviceName}
-                    onChange={(event) => setMobileSyncDeviceName(event.target.value)}
-                    placeholder="Home PC"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  />
-                </label>
+              <p className="text-sm text-muted-foreground">
+                Sign in with the same Firebase account used on Android. Devices under the same
+                uid connect automatically.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => void onMobileSyncGoogleSignIn()}
+                  disabled={mobileSyncBusy || !mobileSyncStatus?.isConfigured}
+                >
+                  {mobileSyncBusy ? "Signing in..." : "Sign In with Google"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void onMobileSyncGithubSignIn()}
+                  disabled={mobileSyncBusy || !mobileSyncStatus?.isConfigured}
+                >
+                  {mobileSyncBusy ? "Signing in..." : "Sign In with GitHub"}
+                </Button>
               </div>
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => void handleLinkClick()}
-                disabled={linkDisabled || !mobileSyncStatus?.baseUrlConfigured}
-              >
-                {mobileSyncBusy ? "Linking..." : "Link Mobile App"}
-              </Button>
             </div>
           )}
 
-          {(mobileSyncError || mobileSyncStatus?.connection?.lastError) && (
+          {(mobileSyncError || mobileSyncStatus?.lastError) && (
             <p className="text-sm text-destructive">
-              {mobileSyncError ?? mobileSyncStatus?.connection?.lastError}
+              {mobileSyncError ?? mobileSyncStatus?.lastError}
             </p>
           )}
         </div>

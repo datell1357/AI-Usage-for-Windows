@@ -361,7 +361,7 @@ export function SettingsPage({
               </p>
               <p className="text-xs text-muted-foreground">
                 {!mobileSyncStatus.googleSignInAvailable
-                  ? "Google requires VITE_GOOGLE_OAUTH_CLIENT_ID and VITE_GOOGLE_OAUTH_CLIENT_SECRET. "
+                  ? "Google requires VITE_GOOGLE_OAUTH_CLIENT_ID. "
                   : ""}
                 {!mobileSyncStatus.githubSignInAvailable
                   ? "GitHub requires VITE_GITHUB_OAUTH_CLIENT_ID."

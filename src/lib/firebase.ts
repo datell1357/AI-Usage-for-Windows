@@ -115,16 +115,13 @@ function readFirebaseConfig(): { config: FirebaseConfig | null; missingKeys: str
 export function getFirebaseRuntimeState(): FirebaseRuntimeState {
   const { config, missingKeys } = readFirebaseConfig()
   const googleClientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID
-  const googleClientSecret = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_SECRET
   const githubClientId = import.meta.env.VITE_GITHUB_OAUTH_CLIENT_ID
   return {
     enabled: Boolean(config),
     missingKeys,
     googleClientConfigured:
       typeof googleClientId === "string" &&
-      googleClientId.trim().length > 0 &&
-      typeof googleClientSecret === "string" &&
-      googleClientSecret.trim().length > 0,
+      googleClientId.trim().length > 0,
     githubClientConfigured: typeof githubClientId === "string" && githubClientId.trim().length > 0,
   }
 }
@@ -178,14 +175,6 @@ function requiredPublicClientId(envKey: "VITE_GOOGLE_OAUTH_CLIENT_ID" | "VITE_GI
   return value.trim()
 }
 
-function requiredOAuthClientSecret(envKey: "VITE_GOOGLE_OAUTH_CLIENT_SECRET", providerName: string): string {
-  const value = import.meta.env[envKey]
-  if (typeof value !== "string" || value.trim().length === 0) {
-    throw new Error(`${providerName} OAuth client secret is not configured on this Windows device`)
-  }
-  return value.trim()
-}
-
 export async function signInWithNativeTokens(tokens: NativeFirebaseOAuthTokens): Promise<User> {
   const { auth } = requiredServices()
   await ensureAuthPersistence(auth)
@@ -207,7 +196,6 @@ export async function signInWithNativeTokens(tokens: NativeFirebaseOAuthTokens):
 
 export async function startGoogleDeviceCodeSignIn(): Promise<NativeFirebaseDeviceCodeSession> {
   const clientId = requiredPublicClientId("VITE_GOOGLE_OAUTH_CLIENT_ID", "Google")
-  const clientSecret = requiredOAuthClientSecret("VITE_GOOGLE_OAUTH_CLIENT_SECRET", "Google")
   const response = await invoke<NativeFirebaseDeviceCodeStart>("firebase_start_google_device_code_sign_in", {
     clientId,
   })
@@ -215,7 +203,6 @@ export async function startGoogleDeviceCodeSignIn(): Promise<NativeFirebaseDevic
     ...response,
     providerLabel: "Google",
     clientId,
-    clientSecret,
     startedAt: Date.now(),
   }
 }
@@ -252,7 +239,6 @@ export async function completeNativeDeviceCodeSignIn(
     const response = session.providerId === "google.com"
       ? await invoke<NativeFirebaseDeviceCodePoll>("firebase_poll_google_device_code_sign_in", {
           clientId: session.clientId,
-          clientSecret: session.clientSecret,
           deviceCode: session.deviceCode,
         })
       : await invoke<NativeFirebaseDeviceCodePoll>("firebase_poll_github_device_code_sign_in", {

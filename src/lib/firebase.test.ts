@@ -70,7 +70,6 @@ describe("firebase native auth helpers", () => {
 
   it("signs in with Google using native device-flow tokens", async () => {
     vi.stubEnv("VITE_GOOGLE_OAUTH_CLIENT_ID", "google-client-id")
-    vi.stubEnv("VITE_GOOGLE_OAUTH_CLIENT_SECRET", "google-client-secret")
     state.invokeMock
       .mockResolvedValueOnce({
         providerId: "google.com",
@@ -102,7 +101,6 @@ describe("firebase native auth helpers", () => {
       "firebase_poll_google_device_code_sign_in",
       {
         clientId: "google-client-id",
-        clientSecret: "google-client-secret",
         deviceCode: "google-device-code",
       }
     )
@@ -154,5 +152,16 @@ describe("firebase native auth helpers", () => {
       { id: "auth" },
       { provider: "github" }
     )
+  })
+
+  it("treats Google sign-in as available when only the public client id is configured", async () => {
+    vi.stubEnv("VITE_GOOGLE_OAUTH_CLIENT_ID", "google-client-id")
+
+    const { getFirebaseRuntimeState } = await import("@/lib/firebase")
+    expect(getFirebaseRuntimeState()).toMatchObject({
+      enabled: true,
+      googleClientConfigured: true,
+      githubClientConfigured: false,
+    })
   })
 })

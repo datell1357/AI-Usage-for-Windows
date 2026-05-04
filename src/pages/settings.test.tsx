@@ -274,16 +274,17 @@ describe("SettingsPage", () => {
         mobileSyncStatus={{
           ...defaultProps.mobileSyncStatus,
           googleSignInAvailable: false,
-          githubSignInAvailable: false,
+          githubSignInAvailable: true,
         }}
       />
     )
 
     expect(screen.getByRole("button", { name: "Sign In with Google" })).toBeDisabled()
-    expect(screen.getByRole("button", { name: "Sign In with GitHub" })).toBeDisabled()
+    expect(screen.getByRole("button", { name: "Sign In with GitHub" })).toBeEnabled()
     expect(screen.getByText(/Native OAuth provider settings are missing/i)).toBeInTheDocument()
-    expect(screen.getByText(/Google requires VITE_GOOGLE_OAUTH_CLIENT_ID and VITE_GOOGLE_OAUTH_CLIENT_SECRET/i)).toBeInTheDocument()
-    expect(screen.getByText(/GitHub requires VITE_GITHUB_OAUTH_CLIENT_ID/i)).toBeInTheDocument()
+    expect(screen.getByText(/Google requires VITE_GOOGLE_OAUTH_CLIENT_ID/i)).toBeInTheDocument()
+    expect(screen.queryByText(/VITE_GOOGLE_OAUTH_CLIENT_SECRET/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/GitHub requires VITE_GITHUB_OAUTH_CLIENT_ID/i)).not.toBeInTheDocument()
   })
 
   it("renders device sync controls when signed in", () => {

@@ -691,10 +691,9 @@ fn firebase_start_google_device_code_sign_in(
 #[tauri::command]
 fn firebase_poll_google_device_code_sign_in(
     client_id: String,
-    client_secret: String,
     device_code: String,
 ) -> Result<NativeFirebaseDeviceCodePoll, String> {
-    poll_google_device_code_sign_in(&client_id, &client_secret, &device_code)
+    poll_google_device_code_sign_in(&client_id, &device_code)
 }
 
 #[tauri::command]
@@ -1058,17 +1057,6 @@ fn validated_public_oauth_client_id(client_id: &str, provider_name: &str) -> Res
     Ok(trimmed.to_string())
 }
 
-fn validated_oauth_client_secret(client_secret: &str, provider_name: &str) -> Result<String, String> {
-    let trimmed = client_secret.trim();
-    if trimmed.is_empty() {
-        return Err(format!("{provider_name} OAuth client secret is not configured on this Windows device"));
-    }
-    if trimmed.len() > 512 {
-        return Err(format!("{provider_name} OAuth client secret is invalid"));
-    }
-    Ok(trimmed.to_string())
-}
-
 fn open_external_browser(url: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
@@ -1144,11 +1132,9 @@ fn start_google_device_code_sign_in(client_id: &str) -> Result<NativeFirebaseDev
 
 fn poll_google_device_code_sign_in(
     client_id: &str,
-    client_secret: &str,
     device_code: &str,
 ) -> Result<NativeFirebaseDeviceCodePoll, String> {
     let client_id = validated_public_oauth_client_id(client_id, "Google")?;
-    let client_secret = validated_oauth_client_secret(client_secret, "Google")?;
     let normalized_device_code = device_code.trim();
     if normalized_device_code.is_empty() {
         return Err("Google device code is missing".to_string());
@@ -1159,7 +1145,6 @@ fn poll_google_device_code_sign_in(
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(encode_form_pairs(&[
             ("client_id", client_id.as_str()),
-            ("client_secret", client_secret.as_str()),
             ("device_code", normalized_device_code),
             ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
         ]))

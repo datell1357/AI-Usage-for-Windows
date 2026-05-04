@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const state = vi.hoisted(() => ({
-  signInWithPopupMock: vi.fn(),
   signInWithRedirectMock: vi.fn(),
   getRedirectResultMock: vi.fn(),
   setPersistenceMock: vi.fn(),
@@ -35,7 +34,6 @@ vi.mock("firebase/auth", () => ({
   GoogleAuthProvider: MockGoogleAuthProvider,
   GithubAuthProvider: MockGithubAuthProvider,
   getRedirectResult: state.getRedirectResultMock,
-  signInWithPopup: state.signInWithPopupMock,
   signInWithRedirect: state.signInWithRedirectMock,
   setPersistence: state.setPersistenceMock,
   onAuthStateChanged: state.onAuthStateChangedMock,
@@ -46,7 +44,6 @@ describe("firebase auth helpers", () => {
   beforeEach(() => {
     vi.resetModules()
     vi.unstubAllEnvs()
-    state.signInWithPopupMock.mockReset()
     state.signInWithRedirectMock.mockReset()
     state.getRedirectResultMock.mockReset()
     state.setPersistenceMock.mockReset()
@@ -73,43 +70,25 @@ describe("firebase auth helpers", () => {
     })
   })
 
-  it("signs in with Google through the Firebase SDK popup flow", async () => {
-    state.signInWithPopupMock.mockResolvedValue({ user: { uid: "user_google" } })
-
+  it("starts Google sign-in through the Firebase SDK redirect flow", async () => {
     const { signInWithGoogle } = await import("@/lib/firebase")
-    await expect(signInWithGoogle()).resolves.toEqual({ uid: "user_google" })
+    await expect(signInWithGoogle()).rejects.toThrow("Redirecting to Google sign-in")
 
     expect(state.setPersistenceMock).toHaveBeenCalledWith(
       { id: "auth" },
       { id: "browserLocalPersistence" }
     )
-    expect(state.signInWithPopupMock).toHaveBeenCalledWith(
-      { id: "auth" },
-      expect.any(MockGoogleAuthProvider)
-    )
-  })
-
-  it("falls back to Firebase redirect when the Google popup is blocked", async () => {
-    const popupError = new Error("Popup blocked")
-    Object.assign(popupError, { code: "auth/popup-blocked" })
-    state.signInWithPopupMock.mockRejectedValue(popupError)
-
-    const { signInWithGoogle } = await import("@/lib/firebase")
-    await expect(signInWithGoogle()).rejects.toThrow("Redirecting to Google sign-in")
-
     expect(state.signInWithRedirectMock).toHaveBeenCalledWith(
       { id: "auth" },
       expect.any(MockGoogleAuthProvider)
     )
   })
 
-  it("signs in with GitHub through the Firebase SDK popup flow", async () => {
-    state.signInWithPopupMock.mockResolvedValue({ user: { uid: "user_github" } })
-
+  it("starts GitHub sign-in through the Firebase SDK redirect flow", async () => {
     const { signInWithGithub } = await import("@/lib/firebase")
-    await expect(signInWithGithub()).resolves.toEqual({ uid: "user_github" })
+    await expect(signInWithGithub()).rejects.toThrow("Redirecting to GitHub sign-in")
 
-    expect(state.signInWithPopupMock).toHaveBeenCalledWith(
+    expect(state.signInWithRedirectMock).toHaveBeenCalledWith(
       { id: "auth" },
       expect.any(MockGithubAuthProvider)
     )

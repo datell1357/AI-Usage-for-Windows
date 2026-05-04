@@ -5,7 +5,7 @@ This document describes the direct Firestore contract for AI Usage for Windows w
 ## Authentication
 
 - Windows signs in with Firebase Auth using Google or GitHub.
-- Windows uses the Firebase Web SDK provider flows (`signInWithPopup`, with `signInWithRedirect` as the popup-blocked fallback).
+- Windows uses the Firebase Web SDK redirect provider flows (`signInWithRedirect` / `getRedirectResult`) so sign-in completes in the main Tauri WebView.
 - Android signs in with the same Firebase project.
 - The same Firebase account produces the same `uid`.
 - No pairing code is used.
@@ -21,7 +21,7 @@ Firebase setup notes:
 
 - Enable Google and GitHub sign-in providers in Firebase Authentication.
 - Keep `VITE_FIREBASE_AUTH_DOMAIN` set to the Firebase auth domain for the same project.
-- For redirect fallback, make sure the app origin used by Tauri is allowed in Firebase Authentication authorized domains.
+- Make sure the app origin used by Tauri is allowed in Firebase Authentication authorized domains.
 
 ## Device identity
 

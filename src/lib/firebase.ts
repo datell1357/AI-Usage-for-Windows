@@ -7,7 +7,6 @@ import {
   GoogleAuthProvider,
   onAuthStateChanged,
   setPersistence,
-  signInWithPopup,
   signInWithRedirect,
   signOut,
   type Auth,
@@ -126,10 +125,6 @@ async function completeRedirectSignIn(auth: Auth): Promise<UserCredential | null
   return getRedirectResult(auth)
 }
 
-function isPopupBlocked(error: unknown): boolean {
-  return error instanceof Error && "code" in error && error.code === "auth/popup-blocked"
-}
-
 export function watchFirebaseUser(callback: (user: User | null) => void): Unsubscribe {
   const services = requiredServices()
   return onAuthStateChanged(services.auth, callback)
@@ -146,16 +141,8 @@ export async function signInWithGoogle(): Promise<User> {
   const provider = new GoogleAuthProvider()
   provider.setCustomParameters({ prompt: "select_account" })
 
-  try {
-    const result = await signInWithPopup(auth, provider)
-    return result.user
-  } catch (error) {
-    if (isPopupBlocked(error)) {
-      await signInWithRedirect(auth, provider)
-      throw new Error("Redirecting to Google sign-in...")
-    }
-    throw error
-  }
+  await signInWithRedirect(auth, provider)
+  throw new Error("Redirecting to Google sign-in...")
 }
 
 export async function signInWithGithub(): Promise<User> {
@@ -165,16 +152,8 @@ export async function signInWithGithub(): Promise<User> {
   provider.addScope("read:user")
   provider.setCustomParameters({ allow_signup: "true" })
 
-  try {
-    const result = await signInWithPopup(auth, provider)
-    return result.user
-  } catch (error) {
-    if (isPopupBlocked(error)) {
-      await signInWithRedirect(auth, provider)
-      throw new Error("Redirecting to GitHub sign-in...")
-    }
-    throw error
-  }
+  await signInWithRedirect(auth, provider)
+  throw new Error("Redirecting to GitHub sign-in...")
 }
 
 export async function signOutFirebase(): Promise<void> {

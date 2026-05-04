@@ -21,7 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { GlobalShortcutSection } from "@/components/global-shortcut-section";
 import type { MobileSyncStatus } from "@/lib/mobile-sync";
-import type { NativeFirebaseDeviceCodeSession } from "@/lib/firebase";
+import type { NativeFirebasePendingAuthSession } from "@/lib/firebase";
 import {
   AUTO_UPDATE_OPTIONS,
   DISPLAY_MODE_OPTIONS,
@@ -123,12 +123,16 @@ interface SettingsPageProps {
   mobileSyncStatus: MobileSyncStatus | null;
   mobileSyncBusy: boolean;
   mobileSyncError: string | null;
-  mobileSyncPendingDeviceCodeAuth: NativeFirebaseDeviceCodeSession | null;
+  mobileSyncPendingDeviceCodeAuth: NativeFirebasePendingAuthSession | null;
   onMobileSyncGoogleSignIn: () => Promise<void> | void;
   onMobileSyncGithubSignIn: () => Promise<void> | void;
   onMobileSyncSyncNow: () => Promise<void> | void;
   onMobileSyncSignOut: () => Promise<void> | void;
   onMobileSyncSaveDeviceName: (deviceName: string) => Promise<void> | void;
+  onMobileSyncSaveOAuthSettings: (
+    googleDesktopClientId: string,
+    githubClientId: string
+  ) => Promise<void> | void;
 }
 
 export function SettingsPage({
@@ -156,9 +160,16 @@ export function SettingsPage({
   onMobileSyncSyncNow,
   onMobileSyncSignOut,
   onMobileSyncSaveDeviceName,
+  onMobileSyncSaveOAuthSettings,
 }: SettingsPageProps) {
   const [mobileSyncDeviceNameDraft, setMobileSyncDeviceNameDraft] = useState(
     mobileSyncStatus?.deviceName ?? ""
+  );
+  const [googleDesktopClientIdDraft, setGoogleDesktopClientIdDraft] = useState(
+    mobileSyncStatus?.googleDesktopClientId ?? ""
+  );
+  const [githubClientIdDraft, setGithubClientIdDraft] = useState(
+    mobileSyncStatus?.githubClientId ?? ""
   );
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -183,6 +194,14 @@ export function SettingsPage({
     setMobileSyncDeviceNameDraft(mobileSyncStatus?.deviceName ?? "");
   }, [mobileSyncStatus?.deviceName]);
 
+  useEffect(() => {
+    setGoogleDesktopClientIdDraft(mobileSyncStatus?.googleDesktopClientId ?? "");
+  }, [mobileSyncStatus?.googleDesktopClientId]);
+
+  useEffect(() => {
+    setGithubClientIdDraft(mobileSyncStatus?.githubClientId ?? "");
+  }, [mobileSyncStatus?.githubClientId]);
+
   const deviceNameSaveDisabled = useMemo(() => {
     if (!mobileSyncStatus?.isAuthenticated) return true;
     return (
@@ -191,6 +210,14 @@ export function SettingsPage({
       mobileSyncDeviceNameDraft.trim() === mobileSyncStatus.deviceName
     );
   }, [mobileSyncBusy, mobileSyncDeviceNameDraft, mobileSyncStatus]);
+
+  const oauthSettingsSaveDisabled = useMemo(
+    () =>
+      mobileSyncBusy ||
+      (googleDesktopClientIdDraft.trim() === (mobileSyncStatus?.googleDesktopClientId ?? "") &&
+        githubClientIdDraft.trim() === (mobileSyncStatus?.githubClientId ?? "")),
+    [githubClientIdDraft, googleDesktopClientIdDraft, mobileSyncBusy, mobileSyncStatus]
+  );
 
   return (
     <div className="py-3 space-y-4">
@@ -340,6 +367,47 @@ export function SettingsPage({
           Sync this Windows device directly to Firebase for the mobile app
         </p>
         <div className="rounded-lg border bg-muted/50 p-3 space-y-3">
+          <div className="space-y-2">
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">Google Desktop Client ID</span>
+              <input
+                aria-label="Google Desktop Client ID"
+                value={googleDesktopClientIdDraft}
+                onChange={(event) => setGoogleDesktopClientIdDraft(event.target.value)}
+                placeholder="Desktop app client ID from Google Cloud"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">GitHub OAuth Client ID</span>
+              <input
+                aria-label="GitHub OAuth Client ID"
+                value={githubClientIdDraft}
+                onChange={(event) => setGithubClientIdDraft(event.target.value)}
+                placeholder="OAuth App client ID with Device Flow enabled"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </label>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                void onMobileSyncSaveOAuthSettings(
+                  googleDesktopClientIdDraft,
+                  githubClientIdDraft
+                )
+              }
+              disabled={oauthSettingsSaveDisabled}
+            >
+              {mobileSyncBusy ? "Saving..." : "Save OAuth Settings"}
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Google must use a Desktop app client ID. GitHub must use an OAuth App client ID with
+              Device Flow enabled.
+            </p>
+          </div>
+
           {!mobileSyncStatus?.isConfigured && (
             <div className="space-y-1">
               <p className="text-sm text-amber-600 dark:text-amber-400">
@@ -361,7 +429,7 @@ export function SettingsPage({
               </p>
               <p className="text-xs text-muted-foreground">
                 {!mobileSyncStatus.googleSignInAvailable
-                  ? "Google requires VITE_GOOGLE_OAUTH_CLIENT_ID. "
+                  ? "Google requires VITE_GOOGLE_DESKTOP_CLIENT_ID. "
                   : ""}
                 {!mobileSyncStatus.githubSignInAvailable
                   ? "GitHub requires VITE_GITHUB_OAUTH_CLIENT_ID."
@@ -447,20 +515,39 @@ export function SettingsPage({
                   <p className="text-sm font-medium">
                     Finish {mobileSyncPendingDeviceCodeAuth.providerLabel} sign-in in your browser
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    If the browser page asks for a code, enter the one below.
-                  </p>
-                  <div className="rounded-md border border-dashed bg-muted px-3 py-2 text-center text-lg font-semibold tracking-[0.2em]">
-                    {mobileSyncPendingDeviceCodeAuth.userCode}
-                  </div>
-                  <a
-                    href={mobileSyncPendingDeviceCodeAuth.verificationUri}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs text-primary underline underline-offset-4"
-                  >
-                    Open verification page
-                  </a>
+                  {mobileSyncPendingDeviceCodeAuth.kind === "device_code" ? (
+                    <>
+                      <p className="text-xs text-muted-foreground">
+                        Enter the verification code below in your browser, then return here.
+                      </p>
+                      <div className="rounded-md border border-dashed bg-muted px-3 py-2 text-center text-lg font-semibold tracking-[0.2em]">
+                        {mobileSyncPendingDeviceCodeAuth.userCode}
+                      </div>
+                      <a
+                        href={mobileSyncPendingDeviceCodeAuth.verificationUri}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-primary underline underline-offset-4"
+                      >
+                        Open verification page
+                      </a>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs text-muted-foreground">
+                        Complete the sign-in page in your browser. The app will continue
+                        automatically after the browser redirects back to this Windows device.
+                      </p>
+                      <a
+                        href={mobileSyncPendingDeviceCodeAuth.authorizationUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-primary underline underline-offset-4"
+                      >
+                        Reopen sign-in page
+                      </a>
+                    </>
+                  )}
                 </div>
               ) : null}
               <div className="flex flex-wrap gap-2">

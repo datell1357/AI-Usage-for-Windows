@@ -68,22 +68,21 @@ describe("firebase native auth helpers", () => {
     })
   })
 
-  it("signs in with Google using native device-flow tokens", async () => {
-    vi.stubEnv("VITE_GOOGLE_OAUTH_CLIENT_ID", "google-client-id")
+  it("signs in with Google using loopback browser auth tokens", async () => {
+    vi.stubEnv("VITE_GOOGLE_DESKTOP_CLIENT_ID", "google-desktop-client-id")
     state.invokeMock
       .mockResolvedValueOnce({
         providerId: "google.com",
-        deviceCode: "google-device-code",
-        userCode: "ABCD-EFGH",
-        verificationUri: "https://google.example/device",
+        flow: "loopback",
+        sessionId: "google-session",
+        authorizationUrl: "https://accounts.google.com/o/oauth2/v2/auth?state=test",
+        callbackUrl: "http://127.0.0.1:43123/oauth/callback",
         expiresInSecs: 900,
-        intervalSecs: 0,
       })
       .mockResolvedValueOnce({
         status: "approved",
         accessToken: "google-access-token",
         idToken: "google-id-token",
-        intervalSecs: 0,
       })
     state.googleCredentialMock.mockReturnValue({ provider: "google" })
     state.signInWithCredentialMock.mockResolvedValue({
@@ -94,14 +93,13 @@ describe("firebase native auth helpers", () => {
     await expect(signInWithGoogle()).resolves.toEqual({ uid: "user_google" })
 
     expect(state.invokeMock).toHaveBeenCalledWith(
-      "firebase_start_google_device_code_sign_in",
-      { clientId: "google-client-id" }
+      "firebase_start_google_loopback_sign_in",
+      { clientId: "google-desktop-client-id" }
     )
     expect(state.invokeMock).toHaveBeenCalledWith(
-      "firebase_poll_google_device_code_sign_in",
+      "firebase_poll_loopback_sign_in",
       {
-        clientId: "google-client-id",
-        deviceCode: "google-device-code",
+        sessionId: "google-session",
       }
     )
     expect(state.googleCredentialMock).toHaveBeenCalledWith(
@@ -114,22 +112,22 @@ describe("firebase native auth helpers", () => {
     )
   })
 
-  it("signs in with GitHub using native device-flow tokens", async () => {
+  it("signs in with GitHub using loopback browser auth tokens", async () => {
     vi.stubEnv("VITE_GITHUB_OAUTH_CLIENT_ID", "github-client-id")
     state.invokeMock
       .mockResolvedValueOnce({
         providerId: "github.com",
-        deviceCode: "github-device-code",
-        userCode: "ZXCV-BNMQ",
+        flow: "device_code",
+        sessionId: "github-session",
         verificationUri: "https://github.com/login/device",
+        userCode: "WDJB-MJHT",
         expiresInSecs: 900,
-        intervalSecs: 0,
+        pollIntervalSecs: 0,
       })
       .mockResolvedValueOnce({
         status: "approved",
         accessToken: "github-access-token",
         idToken: null,
-        intervalSecs: 0,
       })
     state.githubCredentialMock.mockReturnValue({ provider: "github" })
     state.signInWithCredentialMock.mockResolvedValue({
@@ -140,12 +138,12 @@ describe("firebase native auth helpers", () => {
     await expect(signInWithGithub()).resolves.toEqual({ uid: "user_github" })
 
     expect(state.invokeMock).toHaveBeenCalledWith(
-      "firebase_start_github_device_code_sign_in",
+      "firebase_start_github_loopback_sign_in",
       { clientId: "github-client-id" }
     )
     expect(state.invokeMock).toHaveBeenCalledWith(
-      "firebase_poll_github_device_code_sign_in",
-      { clientId: "github-client-id", deviceCode: "github-device-code" }
+      "firebase_poll_loopback_sign_in",
+      { sessionId: "github-session" }
     )
     expect(state.githubCredentialMock).toHaveBeenCalledWith("github-access-token")
     expect(state.signInWithCredentialMock).toHaveBeenCalledWith(
@@ -155,7 +153,7 @@ describe("firebase native auth helpers", () => {
   })
 
   it("treats Google sign-in as available when only the public client id is configured", async () => {
-    vi.stubEnv("VITE_GOOGLE_OAUTH_CLIENT_ID", "google-client-id")
+    vi.stubEnv("VITE_GOOGLE_DESKTOP_CLIENT_ID", "google-desktop-client-id")
 
     const { getFirebaseRuntimeState } = await import("@/lib/firebase")
     expect(getFirebaseRuntimeState()).toMatchObject({

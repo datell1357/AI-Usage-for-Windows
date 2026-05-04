@@ -6,11 +6,18 @@ mod plugin_engine;
 mod tray;
 
 use std::collections::{HashMap, HashSet};
+use std::io::{Read, Write};
+use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
+use std::thread;
+use std::time::{Duration, Instant};
 
+use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use tauri::Emitter;
 use tauri_plugin_log::{Target, TargetKind};
 use tauri_plugin_store::StoreExt;
@@ -25,36 +32,32 @@ const MOBILE_SYNC_UPLOAD_TOKEN_SERVICE: &str = "mobile-sync-upload-token";
 const MOBILE_SYNC_PROTOCOL_VERSION: u32 = 1;
 const MOBILE_SYNC_SCHEMA_VERSION: u32 = 1;
 const MOBILE_SYNC_HTTP_TIMEOUT_MS: u64 = 10_000;
-const FIREBASE_OAUTH_DEVICE_TIMEOUT_SECS: u64 = 900;
+const FIREBASE_OAUTH_SESSION_TIMEOUT_SECS: u64 = 900;
+const FIREBASE_LOOPBACK_HTML_SUCCESS: &str = "<html><body><h3>AI Usage sign-in completed.</h3><p>You can close this window and return to the app.</p></body></html>";
+const FIREBASE_LOOPBACK_HTML_FAILURE: &str = "<html><body><h3>AI Usage sign-in failed.</h3><p>You can close this window and return to the app.</p></body></html>";
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct NativeFirebaseDeviceCodeStart {
+struct NativeFirebaseLoopbackAuthStart {
     provider_id: String,
-    device_code: String,
-    user_code: String,
-    verification_uri: String,
+    session_id: String,
+    flow: String,
+    authorization_url: Option<String>,
+    callback_url: Option<String>,
+    verification_uri: Option<String>,
+    user_code: Option<String>,
     expires_in_secs: u64,
-    interval_secs: u64,
+    poll_interval_secs: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct NativeFirebaseDeviceCodePoll {
+struct NativeFirebaseLoopbackAuthPoll {
     status: String,
     access_token: Option<String>,
     id_token: Option<String>,
-    interval_secs: u64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "snake_case")]
-struct GoogleDeviceCodeResponse {
-    device_code: String,
-    user_code: String,
-    verification_url: String,
-    expires_in: u64,
-    interval: Option<u64>,
+    error: Option<String>,
+    interval_secs: Option<u64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -63,16 +66,7 @@ struct GoogleTokenResponse {
     access_token: Option<String>,
     id_token: Option<String>,
     error: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "snake_case")]
-struct GithubDeviceCodeResponse {
-    device_code: String,
-    user_code: String,
-    verification_uri: String,
-    expires_in: u64,
-    interval: Option<u64>,
+    error_description: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -80,6 +74,45 @@ struct GithubDeviceCodeResponse {
 struct GithubTokenResponse {
     access_token: Option<String>,
     error: Option<String>,
+    error_description: Option<String>,
+    interval: Option<u64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+struct GithubDeviceCodeResponse {
+    device_code: Option<String>,
+    user_code: Option<String>,
+    verification_uri: Option<String>,
+    expires_in: Option<u64>,
+    interval: Option<u64>,
+}
+
+#[derive(Debug, Clone)]
+enum NativeFirebaseLoopbackAuthState {
+    Pending,
+    Approved {
+        access_token: String,
+        id_token: Option<String>,
+    },
+    Failed {
+        message: String,
+    },
+}
+
+#[derive(Debug, Clone)]
+struct NativeFirebaseLoopbackAuthSession {
+    provider_id: String,
+    flow: String,
+    client_id: String,
+    callback_url: Option<String>,
+    state: Option<String>,
+    code_verifier: Option<String>,
+    device_code: Option<String>,
+    poll_interval_secs: Option<u64>,
+    created_at: Instant,
+    expires_in_secs: u64,
+    status: NativeFirebaseLoopbackAuthState,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -162,6 +195,12 @@ struct RuntimeInfo {
 fn managed_shortcut_slot() -> &'static Mutex<Option<String>> {
     static SLOT: OnceLock<Mutex<Option<String>>> = OnceLock::new();
     SLOT.get_or_init(|| Mutex::new(None))
+}
+
+fn firebase_loopback_auth_sessions() -> &'static Mutex<HashMap<String, NativeFirebaseLoopbackAuthSession>> {
+    static SESSIONS: OnceLock<Mutex<HashMap<String, NativeFirebaseLoopbackAuthSession>>> =
+        OnceLock::new();
+    SESSIONS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 /// Shared shortcut handler that toggles the panel when the shortcut is pressed.
@@ -682,33 +721,24 @@ fn mobile_sync_unlink_device(app_handle: tauri::AppHandle) -> Result<MobileSyncS
 }
 
 #[tauri::command]
-fn firebase_start_google_device_code_sign_in(
+fn firebase_start_google_loopback_sign_in(
     client_id: String,
-) -> Result<NativeFirebaseDeviceCodeStart, String> {
-    start_google_device_code_sign_in(&client_id)
+) -> Result<NativeFirebaseLoopbackAuthStart, String> {
+    start_google_loopback_sign_in(&client_id)
 }
 
 #[tauri::command]
-fn firebase_poll_google_device_code_sign_in(
+fn firebase_start_github_loopback_sign_in(
     client_id: String,
-    device_code: String,
-) -> Result<NativeFirebaseDeviceCodePoll, String> {
-    poll_google_device_code_sign_in(&client_id, &device_code)
+) -> Result<NativeFirebaseLoopbackAuthStart, String> {
+    start_github_loopback_sign_in(&client_id)
 }
 
 #[tauri::command]
-fn firebase_start_github_device_code_sign_in(
-    client_id: String,
-) -> Result<NativeFirebaseDeviceCodeStart, String> {
-    start_github_device_code_sign_in(&client_id)
-}
-
-#[tauri::command]
-fn firebase_poll_github_device_code_sign_in(
-    client_id: String,
-    device_code: String,
-) -> Result<NativeFirebaseDeviceCodePoll, String> {
-    poll_github_device_code_sign_in(&client_id, &device_code)
+fn firebase_poll_loopback_sign_in(
+    session_id: String,
+) -> Result<NativeFirebaseLoopbackAuthPoll, String> {
+    poll_loopback_sign_in(&session_id)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -762,10 +792,9 @@ pub fn run() {
             mobile_sync_link_device,
             mobile_sync_sync_now,
             mobile_sync_unlink_device,
-            firebase_start_google_device_code_sign_in,
-            firebase_poll_google_device_code_sign_in,
-            firebase_start_github_device_code_sign_in,
-            firebase_poll_github_device_code_sign_in
+            firebase_start_google_loopback_sign_in,
+            firebase_start_github_loopback_sign_in,
+            firebase_poll_loopback_sign_in
         ])
         .setup(|app| {
             use tauri::Manager;
@@ -1096,103 +1125,86 @@ fn encode_form_pairs(pairs: &[(&str, &str)]) -> String {
         .join("&")
 }
 
-fn start_google_device_code_sign_in(client_id: &str) -> Result<NativeFirebaseDeviceCodeStart, String> {
-    let client_id = validated_public_oauth_client_id(client_id, "Google")?;
-    let client = build_mobile_sync_http_client()?;
-    let device_response = client
-        .post("https://oauth2.googleapis.com/device/code")
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .body(encode_form_pairs(&[
-            ("client_id", client_id.as_str()),
-            ("scope", "openid email profile"),
-        ]))
-        .send()
-        .map_err(|error| format!("google device authorization failed: {}", error))?;
+fn start_google_loopback_sign_in(client_id: &str) -> Result<NativeFirebaseLoopbackAuthStart, String> {
+    start_loopback_sign_in(client_id, "Google", "google.com")
+}
 
-    if !device_response.status().is_success() {
-        let status = device_response.status();
-        let body = device_response.text().unwrap_or_default();
-        return Err(format!("google device authorization failed: {} {}", status, body));
+fn start_github_loopback_sign_in(client_id: &str) -> Result<NativeFirebaseLoopbackAuthStart, String> {
+    start_github_device_sign_in(client_id)
+}
+
+fn start_loopback_sign_in(
+    client_id: &str,
+    provider_name: &str,
+    provider_id: &str,
+) -> Result<NativeFirebaseLoopbackAuthStart, String> {
+    let client_id = validated_public_oauth_client_id(client_id, provider_name)?;
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .map_err(|error| format!("failed to reserve local OAuth callback port: {}", error))?;
+    let local_addr = listener
+        .local_addr()
+        .map_err(|error| format!("failed to read local OAuth callback address: {}", error))?;
+    let callback_url = format!("http://127.0.0.1:{}/oauth/callback", local_addr.port());
+    let session_id = Uuid::new_v4().to_string();
+    let state = Uuid::new_v4().to_string();
+    let code_verifier = build_pkce_code_verifier();
+    let authorization_url = build_provider_authorization_url(
+        provider_id,
+        &client_id,
+        &callback_url,
+        &state,
+        &code_verifier,
+    )?;
+
+    let session = NativeFirebaseLoopbackAuthSession {
+        provider_id: provider_id.to_string(),
+        flow: "loopback".to_string(),
+        client_id: client_id.clone(),
+        callback_url: Some(callback_url.clone()),
+        state: Some(state.clone()),
+        code_verifier: Some(code_verifier.clone()),
+        device_code: None,
+        poll_interval_secs: None,
+        created_at: Instant::now(),
+        expires_in_secs: FIREBASE_OAUTH_SESSION_TIMEOUT_SECS,
+        status: NativeFirebaseLoopbackAuthState::Pending,
+    };
+
+    {
+        let mut sessions = firebase_loopback_auth_sessions()
+            .lock()
+            .map_err(|error| format!("failed to lock OAuth session store: {}", error))?;
+        sessions.insert(session_id.clone(), session);
     }
 
-    let device_code = device_response
-        .json::<GoogleDeviceCodeResponse>()
-        .map_err(|error| format!("invalid google device authorization response: {}", error))?;
+    spawn_loopback_callback_listener(
+        session_id.clone(),
+        client_id.clone(),
+        listener,
+    );
 
-    open_external_browser(&device_code.verification_url)?;
-    Ok(NativeFirebaseDeviceCodeStart {
-        provider_id: "google.com".to_string(),
-        device_code: device_code.device_code,
-        user_code: device_code.user_code,
-        verification_uri: device_code.verification_url,
-        expires_in_secs: device_code.expires_in.min(FIREBASE_OAUTH_DEVICE_TIMEOUT_SECS),
-        interval_secs: device_code.interval.unwrap_or(5).max(1),
+    if let Err(error) = open_external_browser(&authorization_url) {
+        update_loopback_session_failed(&session_id, format!("failed to open browser: {}", error));
+        return Err(error);
+    }
+
+    Ok(NativeFirebaseLoopbackAuthStart {
+        provider_id: provider_id.to_string(),
+        session_id,
+        flow: "loopback".to_string(),
+        authorization_url: Some(authorization_url),
+        callback_url: Some(callback_url),
+        verification_uri: None,
+        user_code: None,
+        expires_in_secs: FIREBASE_OAUTH_SESSION_TIMEOUT_SECS,
+        poll_interval_secs: None,
     })
 }
 
-fn poll_google_device_code_sign_in(
-    client_id: &str,
-    device_code: &str,
-) -> Result<NativeFirebaseDeviceCodePoll, String> {
-    let client_id = validated_public_oauth_client_id(client_id, "Google")?;
-    let normalized_device_code = device_code.trim();
-    if normalized_device_code.is_empty() {
-        return Err("Google device code is missing".to_string());
-    }
-    let client = build_mobile_sync_http_client()?;
-    let token_response = client
-        .post("https://oauth2.googleapis.com/token")
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .body(encode_form_pairs(&[
-            ("client_id", client_id.as_str()),
-            ("device_code", normalized_device_code),
-            ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
-        ]))
-        .send()
-        .map_err(|error| format!("google token exchange failed: {}", error))?;
-
-    let status = token_response.status();
-    let payload = token_response
-        .json::<GoogleTokenResponse>()
-        .map_err(|error| format!("invalid google token response: {}", error))?;
-
-    if status.is_success() {
-        let access_token = payload
-            .access_token
-            .filter(|value| !value.trim().is_empty())
-            .ok_or_else(|| "google token response missing access token".to_string())?;
-        return Ok(NativeFirebaseDeviceCodePoll {
-            status: "approved".to_string(),
-            access_token: Some(access_token),
-            id_token: payload.id_token.filter(|value| !value.trim().is_empty()),
-            interval_secs: 0,
-        });
-    }
-
-    match payload.error.as_deref() {
-        Some("authorization_pending") => Ok(NativeFirebaseDeviceCodePoll {
-            status: "pending".to_string(),
-            access_token: None,
-            id_token: None,
-            interval_secs: 5,
-        }),
-        Some("slow_down") => Ok(NativeFirebaseDeviceCodePoll {
-            status: "pending".to_string(),
-            access_token: None,
-            id_token: None,
-            interval_secs: 10,
-        }),
-        Some("access_denied") => Err("Google sign-in was denied".to_string()),
-        Some("expired_token") => Err("Google sign-in expired before completion".to_string()),
-        Some(error_code) => Err(format!("Google sign-in failed: {}", error_code)),
-        None => Err(format!("Google sign-in failed with status {}", status)),
-    }
-}
-
-fn start_github_device_code_sign_in(client_id: &str) -> Result<NativeFirebaseDeviceCodeStart, String> {
+fn start_github_device_sign_in(client_id: &str) -> Result<NativeFirebaseLoopbackAuthStart, String> {
     let client_id = validated_public_oauth_client_id(client_id, "GitHub")?;
     let client = build_mobile_sync_http_client()?;
-    let device_response = client
+    let response = client
         .post("https://github.com/login/device/code")
         .header("Accept", "application/json")
         .header("Content-Type", "application/x-www-form-urlencoded")
@@ -1201,85 +1213,621 @@ fn start_github_device_code_sign_in(client_id: &str) -> Result<NativeFirebaseDev
             ("scope", "read:user user:email"),
         ]))
         .send()
-        .map_err(|error| format!("github device authorization failed: {}", error))?;
+        .map_err(|error| format!("GitHub device authorization failed: {}", error))?;
 
-    if !device_response.status().is_success() {
-        let status = device_response.status();
-        let body = device_response.text().unwrap_or_default();
-        return Err(format!("github device authorization failed: {} {}", status, body));
+    let status = response.status();
+    let payload = response
+        .json::<GithubDeviceCodeResponse>()
+        .map_err(|error| format!("Invalid GitHub device authorization response: {}", error))?;
+
+    if !status.is_success() {
+        return Err(format!("GitHub device authorization failed with status {}", status));
     }
 
-    let device_code = device_response
-        .json::<GithubDeviceCodeResponse>()
-        .map_err(|error| format!("invalid github device authorization response: {}", error))?;
+    let device_code = payload
+        .device_code
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| "GitHub device authorization did not return a device code".to_string())?;
+    let user_code = payload
+        .user_code
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| "GitHub device authorization did not return a user code".to_string())?;
+    let verification_uri = payload
+        .verification_uri
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| "GitHub device authorization did not return a verification URL".to_string())?;
+    let expires_in_secs = payload.expires_in.unwrap_or(FIREBASE_OAUTH_SESSION_TIMEOUT_SECS);
+    let poll_interval_secs = payload.interval.unwrap_or(5);
+    let session_id = Uuid::new_v4().to_string();
 
-    open_external_browser(&device_code.verification_uri)?;
-    Ok(NativeFirebaseDeviceCodeStart {
+    let session = NativeFirebaseLoopbackAuthSession {
         provider_id: "github.com".to_string(),
-        device_code: device_code.device_code,
-        user_code: device_code.user_code,
-        verification_uri: device_code.verification_uri,
-        expires_in_secs: device_code.expires_in.min(FIREBASE_OAUTH_DEVICE_TIMEOUT_SECS),
-        interval_secs: device_code.interval.unwrap_or(5).max(1),
+        flow: "device_code".to_string(),
+        client_id,
+        callback_url: None,
+        state: None,
+        code_verifier: None,
+        device_code: Some(device_code),
+        poll_interval_secs: Some(poll_interval_secs),
+        created_at: Instant::now(),
+        expires_in_secs,
+        status: NativeFirebaseLoopbackAuthState::Pending,
+    };
+
+    {
+        let mut sessions = firebase_loopback_auth_sessions()
+            .lock()
+            .map_err(|error| format!("failed to lock OAuth session store: {}", error))?;
+        sessions.insert(session_id.clone(), session);
+    }
+
+    Ok(NativeFirebaseLoopbackAuthStart {
+        provider_id: "github.com".to_string(),
+        session_id,
+        flow: "device_code".to_string(),
+        authorization_url: None,
+        callback_url: None,
+        verification_uri: Some(verification_uri),
+        user_code: Some(user_code),
+        expires_in_secs,
+        poll_interval_secs: Some(poll_interval_secs),
     })
 }
 
-fn poll_github_device_code_sign_in(
+fn poll_loopback_sign_in(session_id: &str) -> Result<NativeFirebaseLoopbackAuthPoll, String> {
+    let mut sessions = firebase_loopback_auth_sessions()
+        .lock()
+        .map_err(|error| format!("failed to lock OAuth session store: {}", error))?;
+    let session = sessions
+        .get(session_id)
+        .ok_or_else(|| "OAuth session not found. Start sign-in again.".to_string())?;
+
+    if session.created_at.elapsed() >= Duration::from_secs(session.expires_in_secs) {
+        sessions.remove(session_id);
+        return Ok(NativeFirebaseLoopbackAuthPoll {
+            status: "failed".to_string(),
+            access_token: None,
+            id_token: None,
+            error: Some("Sign-in session expired before completion".to_string()),
+            interval_secs: None,
+        });
+    }
+
+    if session.flow == "device_code"
+        && matches!(session.status, NativeFirebaseLoopbackAuthState::Pending)
+    {
+        let client_id = session.client_id.clone();
+        let device_code = session
+            .device_code
+            .clone()
+            .ok_or_else(|| "GitHub device sign-in code was missing".to_string())?;
+        let current_interval = session.poll_interval_secs.unwrap_or(5);
+
+        drop(sessions);
+
+        let device_poll = poll_github_device_code(&client_id, &device_code, current_interval)?;
+
+        let mut sessions = firebase_loopback_auth_sessions()
+            .lock()
+            .map_err(|error| format!("failed to lock OAuth session store: {}", error))?;
+        let session = sessions
+            .get_mut(session_id)
+            .ok_or_else(|| "OAuth session not found. Start sign-in again.".to_string())?;
+        if let Some(next_interval) = device_poll.next_interval_secs {
+            session.poll_interval_secs = Some(next_interval);
+        }
+        match device_poll.outcome {
+            GithubDevicePollOutcome::Pending => {}
+            GithubDevicePollOutcome::Approved { access_token } => {
+                session.status = NativeFirebaseLoopbackAuthState::Approved {
+                    access_token,
+                    id_token: None,
+                };
+            }
+            GithubDevicePollOutcome::Failed { message } => {
+                session.status = NativeFirebaseLoopbackAuthState::Failed { message };
+            }
+        }
+        return poll_loopback_sign_in(session_id);
+    }
+
+    match &session.status {
+        NativeFirebaseLoopbackAuthState::Pending => Ok(NativeFirebaseLoopbackAuthPoll {
+            status: "pending".to_string(),
+            access_token: None,
+            id_token: None,
+            error: None,
+            interval_secs: session.poll_interval_secs,
+        }),
+        NativeFirebaseLoopbackAuthState::Approved {
+            access_token,
+            id_token,
+        } => {
+            let response = NativeFirebaseLoopbackAuthPoll {
+                status: "approved".to_string(),
+                access_token: Some(access_token.clone()),
+                id_token: id_token.clone(),
+                error: None,
+                interval_secs: session.poll_interval_secs,
+            };
+            sessions.remove(session_id);
+            Ok(response)
+        }
+        NativeFirebaseLoopbackAuthState::Failed { message } => {
+            let response = NativeFirebaseLoopbackAuthPoll {
+                status: "failed".to_string(),
+                access_token: None,
+                id_token: None,
+                error: Some(message.clone()),
+                interval_secs: session.poll_interval_secs,
+            };
+            sessions.remove(session_id);
+            Ok(response)
+        }
+    }
+}
+
+enum GithubDevicePollOutcome {
+    Pending,
+    Approved { access_token: String },
+    Failed { message: String },
+}
+
+struct GithubDevicePollResult {
+    outcome: GithubDevicePollOutcome,
+    next_interval_secs: Option<u64>,
+}
+
+fn poll_github_device_code(
     client_id: &str,
     device_code: &str,
-) -> Result<NativeFirebaseDeviceCodePoll, String> {
-    let client_id = validated_public_oauth_client_id(client_id, "GitHub")?;
-    let normalized_device_code = device_code.trim();
-    if normalized_device_code.is_empty() {
-        return Err("GitHub device code is missing".to_string());
-    }
+    current_interval_secs: u64,
+) -> Result<GithubDevicePollResult, String> {
     let client = build_mobile_sync_http_client()?;
-    let token_response = client
+    let response = client
         .post("https://github.com/login/oauth/access_token")
         .header("Accept", "application/json")
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(encode_form_pairs(&[
-            ("client_id", client_id.as_str()),
-            ("device_code", normalized_device_code),
+            ("client_id", client_id),
+            ("device_code", device_code),
             ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
         ]))
         .send()
-        .map_err(|error| format!("github token exchange failed: {}", error))?;
+        .map_err(|error| format!("GitHub device sign-in polling failed: {}", error))?;
 
-    let status = token_response.status();
-    let payload = token_response
+    let status = response.status();
+    let payload = response
         .json::<GithubTokenResponse>()
-        .map_err(|error| format!("invalid github token response: {}", error))?;
+        .map_err(|error| format!("Invalid GitHub device sign-in polling response: {}", error))?;
 
     if status.is_success() {
         let access_token = payload
             .access_token
             .filter(|value| !value.trim().is_empty())
-            .ok_or_else(|| "github token response missing access token".to_string())?;
-        return Ok(NativeFirebaseDeviceCodePoll {
-            status: "approved".to_string(),
-            access_token: Some(access_token),
-            id_token: None,
-            interval_secs: 0,
+            .ok_or_else(|| "GitHub token response missing access token".to_string())?;
+        return Ok(GithubDevicePollResult {
+            outcome: GithubDevicePollOutcome::Approved { access_token },
+            next_interval_secs: payload.interval,
         });
     }
 
-    match payload.error.as_deref() {
-        Some("authorization_pending") => Ok(NativeFirebaseDeviceCodePoll {
-            status: "pending".to_string(),
-            access_token: None,
-            id_token: None,
-            interval_secs: 5,
-        }),
-        Some("slow_down") => Ok(NativeFirebaseDeviceCodePoll {
-            status: "pending".to_string(),
-            access_token: None,
-            id_token: None,
-            interval_secs: 10,
-        }),
-        Some("access_denied") => Err("GitHub sign-in was denied".to_string()),
-        Some("expired_token") => Err("GitHub sign-in expired before completion".to_string()),
-        Some(error_code) => Err(format!("GitHub sign-in failed: {}", error_code)),
-        None => Err(format!("GitHub sign-in failed with status {}", status)),
+    let next_interval_secs = payload.interval.or(Some(current_interval_secs));
+    let outcome = match payload.error.as_deref() {
+        Some("authorization_pending") => GithubDevicePollOutcome::Pending,
+        Some("slow_down") => GithubDevicePollOutcome::Pending,
+        Some("expired_token") | Some("token_expired") => GithubDevicePollOutcome::Failed {
+            message: "GitHub sign-in expired before completion".to_string(),
+        },
+        Some("access_denied") => GithubDevicePollOutcome::Failed {
+            message: "GitHub sign-in was cancelled in the browser".to_string(),
+        },
+        Some(error_code) => GithubDevicePollOutcome::Failed {
+            message: match payload.error_description {
+                Some(description) if !description.trim().is_empty() => {
+                    format!("GitHub sign-in failed: {} ({})", error_code, description)
+                }
+                _ => format!("GitHub sign-in failed: {}", error_code),
+            },
+        },
+        None => GithubDevicePollOutcome::Failed {
+            message: format!("GitHub sign-in failed with status {}", status),
+        },
+    };
+
+    Ok(GithubDevicePollResult {
+        outcome,
+        next_interval_secs,
+    })
+}
+
+fn build_pkce_code_verifier() -> String {
+    format!(
+        "{}{}",
+        Uuid::new_v4().simple(),
+        Uuid::new_v4().simple()
+    )
+}
+
+fn build_pkce_code_challenge(code_verifier: &str) -> String {
+    let digest = Sha256::digest(code_verifier.as_bytes());
+    URL_SAFE_NO_PAD.encode(digest)
+}
+
+fn build_provider_authorization_url(
+    provider_id: &str,
+    client_id: &str,
+    callback_url: &str,
+    state: &str,
+    code_verifier: &str,
+) -> Result<String, String> {
+    let code_challenge = build_pkce_code_challenge(code_verifier);
+    match provider_id {
+        "google.com" => Ok(format!(
+            "https://accounts.google.com/o/oauth2/v2/auth?{}",
+            encode_form_pairs(&[
+                ("client_id", client_id),
+                ("redirect_uri", callback_url),
+                ("response_type", "code"),
+                ("scope", "openid email profile"),
+                ("state", state),
+                ("code_challenge", code_challenge.as_str()),
+                ("code_challenge_method", "S256"),
+                ("access_type", "offline"),
+                ("prompt", "consent"),
+            ])
+        )),
+        "github.com" => Ok(format!(
+            "https://github.com/login/oauth/authorize?{}",
+            encode_form_pairs(&[
+                ("client_id", client_id),
+                ("redirect_uri", callback_url),
+                ("scope", "read:user user:email"),
+                ("state", state),
+                ("code_challenge", code_challenge.as_str()),
+                ("code_challenge_method", "S256"),
+            ])
+        )),
+        _ => Err(format!("Unsupported Firebase auth provider: {}", provider_id)),
+    }
+}
+
+fn spawn_loopback_callback_listener(
+    session_id: String,
+    client_id: String,
+    listener: TcpListener,
+) {
+    thread::spawn(move || {
+        if listener.set_nonblocking(true).is_err() {
+            update_loopback_session_failed(
+                &session_id,
+                "Failed to prepare local callback listener".to_string(),
+            );
+            return;
+        }
+
+        let deadline = Instant::now() + Duration::from_secs(FIREBASE_OAUTH_SESSION_TIMEOUT_SECS);
+        loop {
+            if Instant::now() >= deadline {
+                update_loopback_session_failed(
+                    &session_id,
+                    "Sign-in session expired before completion".to_string(),
+                );
+                return;
+            }
+
+            match listener.accept() {
+                Ok((stream, _)) => {
+                    handle_loopback_callback_connection(&session_id, &client_id, stream);
+                    return;
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(100));
+                }
+                Err(error) => {
+                    update_loopback_session_failed(
+                        &session_id,
+                        format!("Failed to receive OAuth callback: {}", error),
+                    );
+                    return;
+                }
+            }
+        }
+    });
+}
+
+fn handle_loopback_callback_connection(
+    session_id: &str,
+    client_id: &str,
+    mut stream: TcpStream,
+) {
+    let request_target = match read_loopback_request_target(&mut stream) {
+        Ok(target) => target,
+        Err(error) => {
+            let _ = write_loopback_html_response(&mut stream, 400, FIREBASE_LOOPBACK_HTML_FAILURE);
+            update_loopback_session_failed(session_id, error);
+            return;
+        }
+    };
+
+    let callback = match parse_loopback_callback(&request_target) {
+        Ok(callback) => callback,
+        Err(error) => {
+            let _ = write_loopback_html_response(&mut stream, 400, FIREBASE_LOOPBACK_HTML_FAILURE);
+            update_loopback_session_failed(session_id, error);
+            return;
+        }
+    };
+
+    let session = match get_loopback_session(session_id) {
+        Ok(session) => session,
+        Err(error) => {
+            let _ = write_loopback_html_response(&mut stream, 410, FIREBASE_LOOPBACK_HTML_FAILURE);
+            update_loopback_session_failed(session_id, error.clone());
+            return;
+        }
+    };
+
+    if session.flow != "loopback" {
+        let _ = write_loopback_html_response(&mut stream, 400, FIREBASE_LOOPBACK_HTML_FAILURE);
+        update_loopback_session_failed(session_id, "Unexpected OAuth callback for non-browser flow".to_string());
+        return;
+    }
+
+    let Some(expected_state) = session.state.as_ref() else {
+        let _ = write_loopback_html_response(&mut stream, 400, FIREBASE_LOOPBACK_HTML_FAILURE);
+        update_loopback_session_failed(session_id, "OAuth session state was missing".to_string());
+        return;
+    };
+
+    if callback.state != *expected_state {
+        let _ = write_loopback_html_response(&mut stream, 400, FIREBASE_LOOPBACK_HTML_FAILURE);
+        update_loopback_session_failed(session_id, "OAuth state verification failed".to_string());
+        return;
+    }
+
+    if let Some(error) = callback.error {
+        let _ = write_loopback_html_response(&mut stream, 400, FIREBASE_LOOPBACK_HTML_FAILURE);
+        update_loopback_session_failed(session_id, error);
+        return;
+    }
+
+    let Some(code) = callback.code else {
+        let _ = write_loopback_html_response(&mut stream, 400, FIREBASE_LOOPBACK_HTML_FAILURE);
+        update_loopback_session_failed(session_id, "OAuth callback did not include an authorization code".to_string());
+        return;
+    };
+
+    match exchange_provider_auth_code(
+        &session.provider_id,
+        client_id,
+        session.callback_url.as_deref(),
+        session.code_verifier.as_deref(),
+        &code,
+    ) {
+        Ok((access_token, id_token)) => {
+            let _ = write_loopback_html_response(&mut stream, 200, FIREBASE_LOOPBACK_HTML_SUCCESS);
+            update_loopback_session_approved(session_id, access_token, id_token);
+        }
+        Err(error) => {
+            let _ = write_loopback_html_response(&mut stream, 400, FIREBASE_LOOPBACK_HTML_FAILURE);
+            update_loopback_session_failed(session_id, error);
+        }
+    }
+}
+
+fn read_loopback_request_target(stream: &mut TcpStream) -> Result<String, String> {
+    let mut buffer = [0_u8; 8192];
+    let bytes_read = stream
+        .read(&mut buffer)
+        .map_err(|error| format!("Failed to read OAuth callback request: {}", error))?;
+    let request = String::from_utf8_lossy(&buffer[..bytes_read]);
+    let first_line = request
+        .lines()
+        .next()
+        .ok_or_else(|| "OAuth callback request was empty".to_string())?;
+    let mut parts = first_line.split_whitespace();
+    let method = parts.next().unwrap_or_default();
+    let target = parts.next().unwrap_or_default();
+    if method != "GET" || target.is_empty() {
+        return Err("OAuth callback request was invalid".to_string());
+    }
+    Ok(target.to_string())
+}
+
+#[derive(Debug, Clone)]
+struct ParsedLoopbackCallback {
+    state: String,
+    code: Option<String>,
+    error: Option<String>,
+}
+
+fn parse_loopback_callback(request_target: &str) -> Result<ParsedLoopbackCallback, String> {
+    let url = reqwest::Url::parse(&format!("http://127.0.0.1{}", request_target))
+        .map_err(|error| format!("Failed to parse OAuth callback URL: {}", error))?;
+    let mut state = None;
+    let mut code = None;
+    let mut error = None;
+    let mut error_description = None;
+    for (key, value) in url.query_pairs() {
+        match key.as_ref() {
+            "state" => state = Some(value.to_string()),
+            "code" => code = Some(value.to_string()),
+            "error" => error = Some(value.to_string()),
+            "error_description" => error_description = Some(value.to_string()),
+            _ => {}
+        }
+    }
+
+    let state = state.ok_or_else(|| "OAuth callback was missing state".to_string())?;
+    let error = error.map(|code| match error_description {
+        Some(description) if !description.trim().is_empty() => format!("OAuth sign-in failed: {} ({})", code, description),
+        _ => format!("OAuth sign-in failed: {}", code),
+    });
+
+    Ok(ParsedLoopbackCallback { state, code, error })
+}
+
+fn write_loopback_html_response(
+    stream: &mut TcpStream,
+    status_code: u16,
+    html: &str,
+) -> Result<(), String> {
+    let status_text = match status_code {
+        200 => "OK",
+        400 => "Bad Request",
+        410 => "Gone",
+        _ => "OK",
+    };
+    let response = format!(
+        "HTTP/1.1 {} {}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        status_code,
+        status_text,
+        html.len(),
+        html
+    );
+    stream
+        .write_all(response.as_bytes())
+        .map_err(|error| format!("Failed to write OAuth callback response: {}", error))
+}
+
+fn exchange_provider_auth_code(
+    provider_id: &str,
+    client_id: &str,
+    callback_url: Option<&str>,
+    code_verifier: Option<&str>,
+    code: &str,
+) -> Result<(String, Option<String>), String> {
+    match provider_id {
+        "google.com" => exchange_google_auth_code(
+            client_id,
+            callback_url.ok_or_else(|| "Google sign-in callback URL was missing".to_string())?,
+            code_verifier.ok_or_else(|| "Google sign-in PKCE verifier was missing".to_string())?,
+            code,
+        ),
+        "github.com" => exchange_github_auth_code(
+            client_id,
+            callback_url.ok_or_else(|| "GitHub sign-in callback URL was missing".to_string())?,
+            code_verifier.ok_or_else(|| "GitHub sign-in PKCE verifier was missing".to_string())?,
+            code,
+        ),
+        _ => Err(format!("Unsupported Firebase auth provider: {}", provider_id)),
+    }
+}
+
+fn exchange_google_auth_code(
+    client_id: &str,
+    callback_url: &str,
+    code_verifier: &str,
+    code: &str,
+) -> Result<(String, Option<String>), String> {
+    let client = build_mobile_sync_http_client()?;
+    let response = client
+        .post("https://oauth2.googleapis.com/token")
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(encode_form_pairs(&[
+            ("client_id", client_id),
+            ("code", code),
+            ("code_verifier", code_verifier),
+            ("redirect_uri", callback_url),
+            ("grant_type", "authorization_code"),
+        ]))
+        .send()
+        .map_err(|error| format!("Google token exchange failed: {}", error))?;
+
+    let status = response.status();
+    let payload = response
+        .json::<GoogleTokenResponse>()
+        .map_err(|error| format!("Invalid Google token response: {}", error))?;
+
+    if !status.is_success() {
+        return Err(match (payload.error, payload.error_description) {
+            (Some(code), Some(description)) if !description.trim().is_empty() => {
+                format!("Google sign-in failed: {} ({})", code, description)
+            }
+            (Some(code), _) => format!("Google sign-in failed: {}", code),
+            _ => format!("Google sign-in failed with status {}", status),
+        });
+    }
+
+    let access_token = payload
+        .access_token
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| "Google token response missing access token".to_string())?;
+    Ok((access_token, payload.id_token.filter(|value| !value.trim().is_empty())))
+}
+
+fn exchange_github_auth_code(
+    client_id: &str,
+    callback_url: &str,
+    code_verifier: &str,
+    code: &str,
+) -> Result<(String, Option<String>), String> {
+    let client = build_mobile_sync_http_client()?;
+    let response = client
+        .post("https://github.com/login/oauth/access_token")
+        .header("Accept", "application/json")
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(encode_form_pairs(&[
+            ("client_id", client_id),
+            ("code", code),
+            ("redirect_uri", callback_url),
+            ("code_verifier", code_verifier),
+        ]))
+        .send()
+        .map_err(|error| format!("GitHub token exchange failed: {}", error))?;
+
+    let status = response.status();
+    let payload = response
+        .json::<GithubTokenResponse>()
+        .map_err(|error| format!("Invalid GitHub token response: {}", error))?;
+
+    if !status.is_success() {
+        return Err(match (payload.error, payload.error_description) {
+            (Some(code), Some(description)) if !description.trim().is_empty() => {
+                format!("GitHub sign-in failed: {} ({})", code, description)
+            }
+            (Some(code), _) => format!("GitHub sign-in failed: {}", code),
+            _ => format!("GitHub sign-in failed with status {}", status),
+        });
+    }
+
+    let access_token = payload
+        .access_token
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| "GitHub token response missing access token".to_string())?;
+    Ok((access_token, None))
+}
+
+fn get_loopback_session(session_id: &str) -> Result<NativeFirebaseLoopbackAuthSession, String> {
+    let sessions = firebase_loopback_auth_sessions()
+        .lock()
+        .map_err(|error| format!("failed to lock OAuth session store: {}", error))?;
+    sessions
+        .get(session_id)
+        .cloned()
+        .ok_or_else(|| "OAuth session not found. Start sign-in again.".to_string())
+}
+
+fn update_loopback_session_approved(
+    session_id: &str,
+    access_token: String,
+    id_token: Option<String>,
+) {
+    if let Ok(mut sessions) = firebase_loopback_auth_sessions().lock() {
+        if let Some(session) = sessions.get_mut(session_id) {
+            session.status = NativeFirebaseLoopbackAuthState::Approved {
+                access_token,
+                id_token,
+            };
+        }
+    }
+}
+
+fn update_loopback_session_failed(session_id: &str, message: String) {
+    if let Ok(mut sessions) = firebase_loopback_auth_sessions().lock() {
+        if let Some(session) = sessions.get_mut(session_id) {
+            session.status = NativeFirebaseLoopbackAuthState::Failed { message };
+        }
     }
 }

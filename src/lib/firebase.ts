@@ -14,6 +14,7 @@ import {
 } from "firebase/auth"
 import { invoke } from "@tauri-apps/api/core"
 import { getFirestore, type Firestore } from "firebase/firestore"
+import type { MobileSyncOAuthConfig } from "@/lib/settings"
 
 type FirebaseConfig = {
   apiKey: string
@@ -43,33 +44,49 @@ type NativeFirebaseOAuthTokens = {
   idToken?: string | null
 }
 
-export type NativeFirebaseDeviceCodeSession = {
+export type NativeFirebasePendingAuthSession =
+  | {
+      kind: "loopback"
+      providerId: "google.com"
+      providerLabel: "Google"
+      clientId: string
+      sessionId: string
+      authorizationUrl: string
+      callbackUrl: string
+      expiresInSecs: number
+      startedAt: number
+    }
+  | {
+      kind: "device_code"
+      providerId: "github.com"
+      providerLabel: "GitHub"
+      clientId: string
+      sessionId: string
+      verificationUri: string
+      userCode: string
+      pollIntervalSecs: number
+      expiresInSecs: number
+      startedAt: number
+    }
+
+type NativeFirebaseLoopbackStart = {
   providerId: "google.com" | "github.com"
-  providerLabel: "Google" | "GitHub"
-  clientId: string
-  clientSecret?: string
-  deviceCode: string
-  userCode: string
-  verificationUri: string
+  sessionId: string
+  flow: "loopback" | "device_code"
+  authorizationUrl?: string | null
+  callbackUrl?: string | null
+  verificationUri?: string | null
+  userCode?: string | null
   expiresInSecs: number
-  intervalSecs: number
-  startedAt: number
+  pollIntervalSecs?: number | null
 }
 
-type NativeFirebaseDeviceCodeStart = {
-  providerId: "google.com" | "github.com"
-  deviceCode: string
-  userCode: string
-  verificationUri: string
-  expiresInSecs: number
-  intervalSecs: number
-}
-
-type NativeFirebaseDeviceCodePoll = {
-  status: "pending" | "approved"
+type NativeFirebaseLoopbackPoll = {
+  status: "pending" | "approved" | "failed"
   accessToken?: string | null
   idToken?: string | null
-  intervalSecs: number
+  error?: string | null
+  intervalSecs?: number | null
 }
 
 const requiredConfigKeys = [
@@ -81,6 +98,31 @@ const requiredConfigKeys = [
 
 let cachedServices: FirebaseServices | null = null
 let persistencePromise: Promise<void> | null = null
+const DEFAULT_FIREBASE_OAUTH_POLL_INTERVAL_MS = 2000
+let runtimeOAuthConfig: MobileSyncOAuthConfig = {
+  googleDesktopClientId: null,
+  githubClientId: null,
+}
+
+function normalizePublicClientId(value: string | null | undefined): string | null {
+  if (typeof value !== "string") return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+function getGoogleDesktopClientId(): string | null {
+  return (
+    runtimeOAuthConfig.googleDesktopClientId ??
+    normalizePublicClientId(import.meta.env.VITE_GOOGLE_DESKTOP_CLIENT_ID)
+  )
+}
+
+function getGithubClientId(): string | null {
+  return (
+    runtimeOAuthConfig.githubClientId ??
+    normalizePublicClientId(import.meta.env.VITE_GITHUB_OAUTH_CLIENT_ID)
+  )
+}
 
 function readFirebaseConfig(): { config: FirebaseConfig | null; missingKeys: string[] } {
   const apiKey = import.meta.env.VITE_FIREBASE_API_KEY?.trim()
@@ -114,15 +156,20 @@ function readFirebaseConfig(): { config: FirebaseConfig | null; missingKeys: str
 
 export function getFirebaseRuntimeState(): FirebaseRuntimeState {
   const { config, missingKeys } = readFirebaseConfig()
-  const googleClientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID
-  const githubClientId = import.meta.env.VITE_GITHUB_OAUTH_CLIENT_ID
+  const googleClientId = getGoogleDesktopClientId()
+  const githubClientId = getGithubClientId()
   return {
     enabled: Boolean(config),
     missingKeys,
-    googleClientConfigured:
-      typeof googleClientId === "string" &&
-      googleClientId.trim().length > 0,
-    githubClientConfigured: typeof githubClientId === "string" && githubClientId.trim().length > 0,
+    googleClientConfigured: Boolean(googleClientId),
+    githubClientConfigured: Boolean(githubClientId),
+  }
+}
+
+export function hydrateFirebaseAuthRuntimeConfig(config: Partial<MobileSyncOAuthConfig>): void {
+  runtimeOAuthConfig = {
+    googleDesktopClientId: normalizePublicClientId(config.googleDesktopClientId),
+    githubClientId: normalizePublicClientId(config.githubClientId),
   }
 }
 
@@ -167,12 +214,18 @@ export async function initializeFirebaseAuthFlow(): Promise<null> {
   return null
 }
 
-function requiredPublicClientId(envKey: "VITE_GOOGLE_OAUTH_CLIENT_ID" | "VITE_GITHUB_OAUTH_CLIENT_ID", providerName: string): string {
-  const value = import.meta.env[envKey]
-  if (typeof value !== "string" || value.trim().length === 0) {
+function requiredPublicClientId(
+  envKey: "VITE_GOOGLE_DESKTOP_CLIENT_ID" | "VITE_GITHUB_OAUTH_CLIENT_ID",
+  providerName: string
+): string {
+  const value =
+    envKey === "VITE_GOOGLE_DESKTOP_CLIENT_ID"
+      ? getGoogleDesktopClientId()
+      : getGithubClientId()
+  if (!value) {
     throw new Error(`${providerName} OAuth client ID is not configured on this Windows device`)
   }
-  return value.trim()
+  return value
 }
 
 export async function signInWithNativeTokens(tokens: NativeFirebaseOAuthTokens): Promise<User> {
@@ -194,34 +247,56 @@ export async function signInWithNativeTokens(tokens: NativeFirebaseOAuthTokens):
   throw new Error(`Unsupported Firebase auth provider: ${tokens.providerId}`)
 }
 
-export async function startGoogleDeviceCodeSignIn(): Promise<NativeFirebaseDeviceCodeSession> {
-  const clientId = requiredPublicClientId("VITE_GOOGLE_OAUTH_CLIENT_ID", "Google")
-  const response = await invoke<NativeFirebaseDeviceCodeStart>("firebase_start_google_device_code_sign_in", {
+export async function startGoogleBrowserSignIn(): Promise<NativeFirebasePendingAuthSession> {
+  const clientId = requiredPublicClientId("VITE_GOOGLE_DESKTOP_CLIENT_ID", "Google")
+  const response = await invoke<NativeFirebaseLoopbackStart>("firebase_start_google_loopback_sign_in", {
     clientId,
   })
+  if (response.flow !== "loopback" || !response.authorizationUrl || !response.callbackUrl) {
+    throw new Error("Google sign-in did not return a browser authorization session")
+  }
   return {
-    ...response,
+    kind: "loopback",
+    providerId: "google.com",
     providerLabel: "Google",
     clientId,
+    sessionId: response.sessionId,
+    authorizationUrl: response.authorizationUrl,
+    callbackUrl: response.callbackUrl,
+    expiresInSecs: response.expiresInSecs,
     startedAt: Date.now(),
   }
 }
 
-export async function startGithubDeviceCodeSignIn(): Promise<NativeFirebaseDeviceCodeSession> {
+export async function startGithubBrowserSignIn(): Promise<NativeFirebasePendingAuthSession> {
   const clientId = requiredPublicClientId("VITE_GITHUB_OAUTH_CLIENT_ID", "GitHub")
-  const response = await invoke<NativeFirebaseDeviceCodeStart>("firebase_start_github_device_code_sign_in", {
+  const response = await invoke<NativeFirebaseLoopbackStart>("firebase_start_github_loopback_sign_in", {
     clientId,
   })
+  if (
+    response.flow !== "device_code" ||
+    !response.verificationUri ||
+    !response.userCode ||
+    response.pollIntervalSecs == null
+  ) {
+    throw new Error("GitHub sign-in did not return a device authorization session")
+  }
   return {
-    ...response,
+    kind: "device_code",
+    providerId: "github.com",
     providerLabel: "GitHub",
     clientId,
+    sessionId: response.sessionId,
+    verificationUri: response.verificationUri,
+    userCode: response.userCode,
+    pollIntervalSecs: response.pollIntervalSecs,
+    expiresInSecs: response.expiresInSecs,
     startedAt: Date.now(),
   }
 }
 
-export async function completeNativeDeviceCodeSignIn(
-  session: NativeFirebaseDeviceCodeSession,
+export async function completeNativeBrowserSignIn(
+  session: NativeFirebasePendingAuthSession,
   signal?: AbortSignal
 ): Promise<NativeFirebaseOAuthTokens> {
   while (true) {
@@ -233,18 +308,23 @@ export async function completeNativeDeviceCodeSignIn(
     }
 
     await new Promise((resolve) => {
-      window.setTimeout(resolve, Math.max(session.intervalSecs, 1) * 1000)
+      const delayMs =
+        session.kind === "device_code"
+          ? session.pollIntervalSecs * 1000
+          : DEFAULT_FIREBASE_OAUTH_POLL_INTERVAL_MS
+      window.setTimeout(resolve, delayMs)
     })
 
-    const response = session.providerId === "google.com"
-      ? await invoke<NativeFirebaseDeviceCodePoll>("firebase_poll_google_device_code_sign_in", {
-          clientId: session.clientId,
-          deviceCode: session.deviceCode,
-        })
-      : await invoke<NativeFirebaseDeviceCodePoll>("firebase_poll_github_device_code_sign_in", {
-          clientId: session.clientId,
-          deviceCode: session.deviceCode,
-        })
+    const response = await invoke<NativeFirebaseLoopbackPoll>("firebase_poll_loopback_sign_in", {
+      sessionId: session.sessionId,
+    })
+
+    if (session.kind === "device_code" && response.intervalSecs && response.intervalSecs > 0) {
+      session = {
+        ...session,
+        pollIntervalSecs: response.intervalSecs,
+      }
+    }
 
     if (response.status === "approved") {
       const accessToken = response.accessToken?.trim()
@@ -257,20 +337,21 @@ export async function completeNativeDeviceCodeSignIn(
         idToken: response.idToken ?? null,
       }
     }
-
-    session.intervalSecs = Math.max(response.intervalSecs, session.intervalSecs, 1)
+    if (response.status === "failed") {
+      throw new Error(response.error?.trim() || `${session.providerLabel} sign-in failed`)
+    }
   }
 }
 
 export async function signInWithGoogle(): Promise<User> {
-  const session = await startGoogleDeviceCodeSignIn()
-  const tokens = await completeNativeDeviceCodeSignIn(session)
+  const session = await startGoogleBrowserSignIn()
+  const tokens = await completeNativeBrowserSignIn(session)
   return signInWithNativeTokens(tokens)
 }
 
 export async function signInWithGithub(): Promise<User> {
-  const session = await startGithubDeviceCodeSignIn()
-  const tokens = await completeNativeDeviceCodeSignIn(session)
+  const session = await startGithubBrowserSignIn()
+  const tokens = await completeNativeBrowserSignIn(session)
   return signInWithNativeTokens(tokens)
 }
 

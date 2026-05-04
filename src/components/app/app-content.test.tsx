@@ -73,6 +73,7 @@ function createProps(): AppContentProps {
     onMobileSyncSyncNow: vi.fn(),
     onMobileSyncSignOut: vi.fn(),
     onMobileSyncSaveDeviceName: vi.fn(),
+    onMobileSyncSaveOAuthSettings: vi.fn(),
   }
 }
 

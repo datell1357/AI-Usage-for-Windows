@@ -182,6 +182,7 @@ function App() {
     handleMobileSyncSyncNow,
     handleMobileSyncSignOut,
     handleMobileSyncSaveDeviceName,
+    handleMobileSyncSaveOAuthSettings,
   } = useMobileSync({
     pluginSettings,
     pluginsMeta,
@@ -273,6 +274,7 @@ function App() {
         onMobileSyncSyncNow: handleMobileSyncSyncNow,
         onMobileSyncSignOut: handleMobileSyncSignOut,
         onMobileSyncSaveDeviceName: handleMobileSyncSaveDeviceName,
+        onMobileSyncSaveOAuthSettings: handleMobileSyncSaveOAuthSettings,
       }}
     />
   )

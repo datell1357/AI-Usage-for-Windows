@@ -65,6 +65,8 @@ const defaultProps = {
     missingConfigKeys: [],
     googleSignInAvailable: true,
     githubSignInAvailable: true,
+    googleDesktopClientId: "",
+    githubClientId: "",
     isAuthenticated: false,
     account: null,
     deviceId: "dev_test",
@@ -84,6 +86,7 @@ const defaultProps = {
   onMobileSyncSyncNow: vi.fn(),
   onMobileSyncSignOut: vi.fn(),
   onMobileSyncSaveDeviceName: vi.fn(),
+  onMobileSyncSaveOAuthSettings: vi.fn(),
 }
 
 afterEach(() => {
@@ -236,34 +239,65 @@ describe("SettingsPage", () => {
   it("renders mobile sync sign-in controls when no account is linked", () => {
     render(<SettingsPage {...defaultProps} />)
     expect(screen.getByText("Mobile Sync")).toBeInTheDocument()
+    expect(screen.getByLabelText("Google Desktop Client ID")).toBeInTheDocument()
+    expect(screen.getByLabelText("GitHub OAuth Client ID")).toBeInTheDocument()
     expect(screen.getByText(/Sign in with the same Firebase account used on Android/i)).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Sign In with Google" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Sign In with GitHub" })).toBeInTheDocument()
   })
 
-  it("shows the pending device code during native provider sign-in", () => {
+  it("shows the pending browser sign-in state during native provider sign-in", () => {
     render(
       <SettingsPage
         {...defaultProps}
         mobileSyncPendingDeviceCodeAuth={{
+          kind: "loopback",
           providerId: "google.com",
           providerLabel: "Google",
           clientId: "google-client-id",
-          deviceCode: "device-code",
-          userCode: "ABCD-EFGH",
-          verificationUri: "https://example.com/device",
+          sessionId: "google-session",
+          authorizationUrl: "https://example.com/sign-in",
+          callbackUrl: "http://127.0.0.1:43123/oauth/callback",
           expiresInSecs: 900,
-          intervalSecs: 5,
           startedAt: Date.now(),
         }}
       />
     )
 
     expect(screen.getByText(/Finish Google sign-in in your browser/i)).toBeInTheDocument()
-    expect(screen.getByText("ABCD-EFGH")).toBeInTheDocument()
+    expect(
+      screen.getByText(/Complete the sign-in page in your browser/i)
+    ).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Reopen sign-in page" })).toHaveAttribute(
+      "href",
+      "https://example.com/sign-in"
+    )
+  })
+
+  it("shows the pending GitHub device code when native OAuth needs browser verification", () => {
+    render(
+      <SettingsPage
+        {...defaultProps}
+        mobileSyncPendingDeviceCodeAuth={{
+          kind: "device_code",
+          providerId: "github.com",
+          providerLabel: "GitHub",
+          clientId: "github-client-id",
+          sessionId: "github-session",
+          verificationUri: "https://github.com/login/device",
+          userCode: "WDJB-MJHT",
+          pollIntervalSecs: 5,
+          expiresInSecs: 900,
+          startedAt: Date.now(),
+        }}
+      />
+    )
+
+    expect(screen.getByText(/Finish GitHub sign-in in your browser/i)).toBeInTheDocument()
+    expect(screen.getByText("WDJB-MJHT")).toBeInTheDocument()
     expect(screen.getByRole("link", { name: "Open verification page" })).toHaveAttribute(
       "href",
-      "https://example.com/device"
+      "https://github.com/login/device"
     )
   })
 
@@ -282,8 +316,7 @@ describe("SettingsPage", () => {
     expect(screen.getByRole("button", { name: "Sign In with Google" })).toBeDisabled()
     expect(screen.getByRole("button", { name: "Sign In with GitHub" })).toBeEnabled()
     expect(screen.getByText(/Native OAuth provider settings are missing/i)).toBeInTheDocument()
-    expect(screen.getByText(/Google requires VITE_GOOGLE_OAUTH_CLIENT_ID/i)).toBeInTheDocument()
-    expect(screen.queryByText(/VITE_GOOGLE_OAUTH_CLIENT_SECRET/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/Google requires VITE_GOOGLE_DESKTOP_CLIENT_ID/i)).toBeInTheDocument()
     expect(screen.queryByText(/GitHub requires VITE_GITHUB_OAUTH_CLIENT_ID/i)).not.toBeInTheDocument()
   })
 

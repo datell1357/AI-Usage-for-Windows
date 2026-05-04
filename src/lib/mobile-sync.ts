@@ -7,6 +7,7 @@ import {
   DEFAULT_MOBILE_SYNC_DEVICE_NAME,
   loadMobileSyncDeviceId,
   loadMobileSyncDeviceName,
+  loadMobileSyncOAuthConfig,
   saveMobileSyncDeviceId,
   saveMobileSyncDeviceName,
 } from "@/lib/settings"
@@ -34,6 +35,8 @@ export type MobileSyncStatus = {
   missingConfigKeys: string[]
   googleSignInAvailable: boolean
   githubSignInAvailable: boolean
+  googleDesktopClientId: string
+  githubClientId: string
   isAuthenticated: boolean
   account: MobileSyncAccount | null
   deviceId: string | null
@@ -76,13 +79,18 @@ type BuildMobileSyncSnapshotArgs = {
   pluginStates: Record<string, PluginState>
 }
 
-function makeDefaultStatus(): MobileSyncStatus {
+function makeDefaultStatus(oauthConfig?: {
+  googleDesktopClientId: string | null
+  githubClientId: string | null
+}): MobileSyncStatus {
   const runtime = getFirebaseRuntimeState()
   return {
     isConfigured: runtime.enabled,
     missingConfigKeys: runtime.missingKeys,
     googleSignInAvailable: runtime.enabled && runtime.googleClientConfigured,
     githubSignInAvailable: runtime.enabled && runtime.githubClientConfigured,
+    googleDesktopClientId: oauthConfig?.googleDesktopClientId ?? "",
+    githubClientId: oauthConfig?.githubClientId ?? "",
     isAuthenticated: false,
     account: null,
     deviceId: null,
@@ -386,10 +394,13 @@ export async function uploadMobileSyncSnapshot(
 }
 
 export async function getInitialMobileSyncStatus(): Promise<MobileSyncStatus> {
-  const deviceId = await loadMobileSyncDeviceId()
-  const deviceName = await loadMobileSyncDeviceName()
+  const [deviceId, deviceName, oauthConfig] = await Promise.all([
+    loadMobileSyncDeviceId(),
+    loadMobileSyncDeviceName(),
+    loadMobileSyncOAuthConfig(),
+  ])
   return {
-    ...makeDefaultStatus(),
+    ...makeDefaultStatus(oauthConfig),
     deviceId,
     deviceName,
   }
@@ -418,7 +429,7 @@ export function buildAuthenticatedMobileSyncStatus(
 }
 
 export function buildSignedOutMobileSyncStatus(previousStatus?: MobileSyncStatus): MobileSyncStatus {
-  const fallback = makeDefaultStatus()
+  const fallback = makeDefaultStatus(previousStatus)
   if (!previousStatus) {
     return fallback
   }

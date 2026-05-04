@@ -3,14 +3,15 @@ import { getVersion } from "@tauri-apps/api/app"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { PluginMeta } from "@/lib/plugin-types"
 import {
-  completeNativeDeviceCodeSignIn,
+  completeNativeBrowserSignIn,
+  hydrateFirebaseAuthRuntimeConfig,
   initializeFirebaseAuthFlow,
   signInWithNativeTokens,
-  startGithubDeviceCodeSignIn,
-  startGoogleDeviceCodeSignIn,
+  startGithubBrowserSignIn,
+  startGoogleBrowserSignIn,
   signOutFirebase,
   watchFirebaseUser,
-  type NativeFirebaseDeviceCodeSession,
+  type NativeFirebasePendingAuthSession,
 } from "@/lib/firebase"
 import {
   buildAuthenticatedMobileSyncStatus,
@@ -22,7 +23,11 @@ import {
   writeMobileSyncDeviceName,
   type MobileSyncStatus,
 } from "@/lib/mobile-sync"
-import type { PluginSettings } from "@/lib/settings"
+import {
+  loadMobileSyncOAuthConfig,
+  saveMobileSyncOAuthConfig,
+  type PluginSettings,
+} from "@/lib/settings"
 import type { PluginState } from "@/hooks/app/types"
 
 type UseMobileSyncArgs = {
@@ -49,8 +54,8 @@ export function useMobileSync({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [currentUser, setCurrentUser] = useState<User | null>(null)
-  const [pendingDeviceCodeAuth, setPendingDeviceCodeAuth] =
-    useState<NativeFirebaseDeviceCodeSession | null>(null)
+  const [pendingBrowserAuth, setPendingBrowserAuth] =
+    useState<NativeFirebasePendingAuthSession | null>(null)
   const appVersionRef = useRef("0.2.0")
   const lastUploadedFingerprintRef = useRef<string | null>(null)
   const authAbortControllerRef = useRef<AbortController | null>(null)
@@ -119,7 +124,11 @@ export function useMobileSync({
         console.error("Failed to load app version for Mobile Sync:", versionError)
       })
 
-    void getInitialMobileSyncStatus()
+    void loadMobileSyncOAuthConfig()
+      .then((oauthConfig) => {
+        hydrateFirebaseAuthRuntimeConfig(oauthConfig)
+        return getInitialMobileSyncStatus()
+      })
       .then((initialStatus) => {
         if (!cancelled) {
           setStatus(initialStatus)
@@ -207,12 +216,12 @@ export function useMobileSync({
     setBusy(true)
     setError(null)
     try {
-      const session = await startGoogleDeviceCodeSignIn()
-      setPendingDeviceCodeAuth(session)
+      const session = await startGoogleBrowserSignIn()
+      setPendingBrowserAuth(session)
       authAbortControllerRef.current?.abort()
       const controller = new AbortController()
       authAbortControllerRef.current = controller
-      const tokens = await completeNativeDeviceCodeSignIn(session, controller.signal)
+      const tokens = await completeNativeBrowserSignIn(session, controller.signal)
       await signInWithNativeTokens(tokens)
     } catch (signInError) {
       console.error("Failed to sign in with Google:", signInError)
@@ -220,7 +229,7 @@ export function useMobileSync({
       throw signInError
     } finally {
       authAbortControllerRef.current = null
-      setPendingDeviceCodeAuth(null)
+      setPendingBrowserAuth(null)
       setBusy(false)
     }
   }, [])
@@ -229,12 +238,12 @@ export function useMobileSync({
     setBusy(true)
     setError(null)
     try {
-      const session = await startGithubDeviceCodeSignIn()
-      setPendingDeviceCodeAuth(session)
+      const session = await startGithubBrowserSignIn()
+      setPendingBrowserAuth(session)
       authAbortControllerRef.current?.abort()
       const controller = new AbortController()
       authAbortControllerRef.current = controller
-      const tokens = await completeNativeDeviceCodeSignIn(session, controller.signal)
+      const tokens = await completeNativeBrowserSignIn(session, controller.signal)
       await signInWithNativeTokens(tokens)
     } catch (signInError) {
       console.error("Failed to sign in with GitHub:", signInError)
@@ -242,7 +251,7 @@ export function useMobileSync({
       throw signInError
     } finally {
       authAbortControllerRef.current = null
-      setPendingDeviceCodeAuth(null)
+      setPendingBrowserAuth(null)
       setBusy(false)
     }
   }, [])
@@ -331,6 +340,39 @@ export function useMobileSync({
     [currentUser]
   )
 
+  const handleOAuthSettingsSave = useCallback(
+    async (googleDesktopClientId: string, githubClientId: string) => {
+      setBusy(true)
+      setError(null)
+      try {
+        const oauthConfig = { googleDesktopClientId, githubClientId }
+        await saveMobileSyncOAuthConfig(oauthConfig)
+        hydrateFirebaseAuthRuntimeConfig(oauthConfig)
+        const nextStatus = await getInitialMobileSyncStatus()
+        setStatus((currentStatus) =>
+          currentStatus
+            ? {
+                ...currentStatus,
+                isConfigured: nextStatus.isConfigured,
+                missingConfigKeys: nextStatus.missingConfigKeys,
+                googleSignInAvailable: nextStatus.googleSignInAvailable,
+                githubSignInAvailable: nextStatus.githubSignInAvailable,
+                googleDesktopClientId: nextStatus.googleDesktopClientId,
+                githubClientId: nextStatus.githubClientId,
+              }
+            : nextStatus
+        )
+      } catch (saveError) {
+        console.error("Failed to save Mobile Sync OAuth settings:", saveError)
+        setError(formatErrorMessage(saveError, "Failed to save OAuth settings"))
+        throw saveError
+      } finally {
+        setBusy(false)
+      }
+    },
+    []
+  )
+
   useEffect(() => {
     if (!currentUser || !status?.isAuthenticated || !status.syncEnabled) return
     if (busy) return
@@ -378,11 +420,12 @@ export function useMobileSync({
     mobileSyncStatus: status,
     mobileSyncBusy: busy,
     mobileSyncError: error,
-    mobileSyncPendingDeviceCodeAuth: pendingDeviceCodeAuth,
+    mobileSyncPendingDeviceCodeAuth: pendingBrowserAuth,
     handleMobileSyncGoogleSignIn: handleGoogleSignIn,
     handleMobileSyncGithubSignIn: handleGithubSignIn,
     handleMobileSyncSyncNow: handleSyncNow,
     handleMobileSyncSignOut: handleSignOut,
     handleMobileSyncSaveDeviceName: handleDeviceNameSave,
+    handleMobileSyncSaveOAuthSettings: handleOAuthSettingsSave,
   }
 }

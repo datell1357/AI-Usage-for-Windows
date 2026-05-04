@@ -64,6 +64,15 @@ function createProps(): AppContentProps {
     onResetTimerDisplayModeToggle: vi.fn(),
     onGlobalShortcutChange: vi.fn(),
     onStartOnLoginChange: vi.fn(),
+    mobileSyncStatus: null,
+    mobileSyncBusy: false,
+    mobileSyncError: null,
+    mobileSyncPendingDeviceCodeAuth: null,
+    onMobileSyncGoogleSignIn: vi.fn(),
+    onMobileSyncGithubSignIn: vi.fn(),
+    onMobileSyncSyncNow: vi.fn(),
+    onMobileSyncSignOut: vi.fn(),
+    onMobileSyncSaveDeviceName: vi.fn(),
   }
 }
 

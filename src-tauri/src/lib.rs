@@ -25,6 +25,62 @@ const MOBILE_SYNC_UPLOAD_TOKEN_SERVICE: &str = "mobile-sync-upload-token";
 const MOBILE_SYNC_PROTOCOL_VERSION: u32 = 1;
 const MOBILE_SYNC_SCHEMA_VERSION: u32 = 1;
 const MOBILE_SYNC_HTTP_TIMEOUT_MS: u64 = 10_000;
+const FIREBASE_OAUTH_DEVICE_TIMEOUT_SECS: u64 = 900;
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct NativeFirebaseDeviceCodeStart {
+    provider_id: String,
+    device_code: String,
+    user_code: String,
+    verification_uri: String,
+    expires_in_secs: u64,
+    interval_secs: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct NativeFirebaseDeviceCodePoll {
+    status: String,
+    access_token: Option<String>,
+    id_token: Option<String>,
+    interval_secs: u64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+struct GoogleDeviceCodeResponse {
+    device_code: String,
+    user_code: String,
+    verification_url: String,
+    expires_in: u64,
+    interval: Option<u64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+struct GoogleTokenResponse {
+    access_token: Option<String>,
+    id_token: Option<String>,
+    error: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+struct GithubDeviceCodeResponse {
+    device_code: String,
+    user_code: String,
+    verification_uri: String,
+    expires_in: u64,
+    interval: Option<u64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+struct GithubTokenResponse {
+    access_token: Option<String>,
+    error: Option<String>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -625,6 +681,36 @@ fn mobile_sync_unlink_device(app_handle: tauri::AppHandle) -> Result<MobileSyncS
     Ok(build_mobile_sync_status(None))
 }
 
+#[tauri::command]
+fn firebase_start_google_device_code_sign_in(
+    client_id: String,
+) -> Result<NativeFirebaseDeviceCodeStart, String> {
+    start_google_device_code_sign_in(&client_id)
+}
+
+#[tauri::command]
+fn firebase_poll_google_device_code_sign_in(
+    client_id: String,
+    device_code: String,
+) -> Result<NativeFirebaseDeviceCodePoll, String> {
+    poll_google_device_code_sign_in(&client_id, &device_code)
+}
+
+#[tauri::command]
+fn firebase_start_github_device_code_sign_in(
+    client_id: String,
+) -> Result<NativeFirebaseDeviceCodeStart, String> {
+    start_github_device_code_sign_in(&client_id)
+}
+
+#[tauri::command]
+fn firebase_poll_github_device_code_sign_in(
+    client_id: String,
+    device_code: String,
+) -> Result<NativeFirebaseDeviceCodePoll, String> {
+    poll_github_device_code_sign_in(&client_id, &device_code)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let runtime = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
@@ -675,7 +761,11 @@ pub fn run() {
             mobile_sync_get_status,
             mobile_sync_link_device,
             mobile_sync_sync_now,
-            mobile_sync_unlink_device
+            mobile_sync_unlink_device,
+            firebase_start_google_device_code_sign_in,
+            firebase_poll_google_device_code_sign_in,
+            firebase_start_github_device_code_sign_in,
+            firebase_poll_github_device_code_sign_in
         ])
         .setup(|app| {
             use tauri::Manager;
@@ -954,4 +1044,242 @@ fn upload_mobile_sync_snapshot(
     }
 
     Ok(())
+}
+
+fn validated_public_oauth_client_id(client_id: &str, provider_name: &str) -> Result<String, String> {
+    let trimmed = client_id.trim();
+    if trimmed.is_empty() {
+        return Err(format!("{provider_name} OAuth client ID is not configured on this Windows device"));
+    }
+    if trimmed.len() > 256 || trimmed.contains(char::is_whitespace) {
+        return Err(format!("{provider_name} OAuth client ID is invalid"));
+    }
+    Ok(trimmed.to_string())
+}
+
+fn open_external_browser(url: &str) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("rundll32.exe")
+            .args(["url.dll,FileProtocolHandler", url])
+            .spawn()
+            .map_err(|error| format!("failed to open browser: {}", error))?;
+        return Ok(());
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = url;
+        Err("external browser sign-in is only implemented for Windows".to_string())
+    }
+}
+
+fn encode_form_component(value: &str) -> String {
+    let mut output = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                output.push(byte as char);
+            }
+            b' ' => output.push('+'),
+            _ => output.push_str(&format!("%{:02X}", byte)),
+        }
+    }
+    output
+}
+
+fn encode_form_pairs(pairs: &[(&str, &str)]) -> String {
+    pairs
+        .iter()
+        .map(|(key, value)| format!("{}={}", encode_form_component(key), encode_form_component(value)))
+        .collect::<Vec<_>>()
+        .join("&")
+}
+
+fn start_google_device_code_sign_in(client_id: &str) -> Result<NativeFirebaseDeviceCodeStart, String> {
+    let client_id = validated_public_oauth_client_id(client_id, "Google")?;
+    let client = build_mobile_sync_http_client()?;
+    let device_response = client
+        .post("https://oauth2.googleapis.com/device/code")
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(encode_form_pairs(&[
+            ("client_id", client_id.as_str()),
+            ("scope", "openid email profile"),
+        ]))
+        .send()
+        .map_err(|error| format!("google device authorization failed: {}", error))?;
+
+    if !device_response.status().is_success() {
+        let status = device_response.status();
+        let body = device_response.text().unwrap_or_default();
+        return Err(format!("google device authorization failed: {} {}", status, body));
+    }
+
+    let device_code = device_response
+        .json::<GoogleDeviceCodeResponse>()
+        .map_err(|error| format!("invalid google device authorization response: {}", error))?;
+
+    open_external_browser(&device_code.verification_url)?;
+    Ok(NativeFirebaseDeviceCodeStart {
+        provider_id: "google.com".to_string(),
+        device_code: device_code.device_code,
+        user_code: device_code.user_code,
+        verification_uri: device_code.verification_url,
+        expires_in_secs: device_code.expires_in.min(FIREBASE_OAUTH_DEVICE_TIMEOUT_SECS),
+        interval_secs: device_code.interval.unwrap_or(5).max(1),
+    })
+}
+
+fn poll_google_device_code_sign_in(
+    client_id: &str,
+    device_code: &str,
+) -> Result<NativeFirebaseDeviceCodePoll, String> {
+    let client_id = validated_public_oauth_client_id(client_id, "Google")?;
+    let normalized_device_code = device_code.trim();
+    if normalized_device_code.is_empty() {
+        return Err("Google device code is missing".to_string());
+    }
+    let client = build_mobile_sync_http_client()?;
+    let token_response = client
+        .post("https://oauth2.googleapis.com/token")
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(encode_form_pairs(&[
+            ("client_id", client_id.as_str()),
+            ("device_code", normalized_device_code),
+            ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
+        ]))
+        .send()
+        .map_err(|error| format!("google token exchange failed: {}", error))?;
+
+    let status = token_response.status();
+    let payload = token_response
+        .json::<GoogleTokenResponse>()
+        .map_err(|error| format!("invalid google token response: {}", error))?;
+
+    if status.is_success() {
+        let access_token = payload
+            .access_token
+            .filter(|value| !value.trim().is_empty())
+            .ok_or_else(|| "google token response missing access token".to_string())?;
+        return Ok(NativeFirebaseDeviceCodePoll {
+            status: "approved".to_string(),
+            access_token: Some(access_token),
+            id_token: payload.id_token.filter(|value| !value.trim().is_empty()),
+            interval_secs: 0,
+        });
+    }
+
+    match payload.error.as_deref() {
+        Some("authorization_pending") => Ok(NativeFirebaseDeviceCodePoll {
+            status: "pending".to_string(),
+            access_token: None,
+            id_token: None,
+            interval_secs: 5,
+        }),
+        Some("slow_down") => Ok(NativeFirebaseDeviceCodePoll {
+            status: "pending".to_string(),
+            access_token: None,
+            id_token: None,
+            interval_secs: 10,
+        }),
+        Some("access_denied") => Err("Google sign-in was denied".to_string()),
+        Some("expired_token") => Err("Google sign-in expired before completion".to_string()),
+        Some(error_code) => Err(format!("Google sign-in failed: {}", error_code)),
+        None => Err(format!("Google sign-in failed with status {}", status)),
+    }
+}
+
+fn start_github_device_code_sign_in(client_id: &str) -> Result<NativeFirebaseDeviceCodeStart, String> {
+    let client_id = validated_public_oauth_client_id(client_id, "GitHub")?;
+    let client = build_mobile_sync_http_client()?;
+    let device_response = client
+        .post("https://github.com/login/device/code")
+        .header("Accept", "application/json")
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(encode_form_pairs(&[
+            ("client_id", client_id.as_str()),
+            ("scope", "read:user user:email"),
+        ]))
+        .send()
+        .map_err(|error| format!("github device authorization failed: {}", error))?;
+
+    if !device_response.status().is_success() {
+        let status = device_response.status();
+        let body = device_response.text().unwrap_or_default();
+        return Err(format!("github device authorization failed: {} {}", status, body));
+    }
+
+    let device_code = device_response
+        .json::<GithubDeviceCodeResponse>()
+        .map_err(|error| format!("invalid github device authorization response: {}", error))?;
+
+    open_external_browser(&device_code.verification_uri)?;
+    Ok(NativeFirebaseDeviceCodeStart {
+        provider_id: "github.com".to_string(),
+        device_code: device_code.device_code,
+        user_code: device_code.user_code,
+        verification_uri: device_code.verification_uri,
+        expires_in_secs: device_code.expires_in.min(FIREBASE_OAUTH_DEVICE_TIMEOUT_SECS),
+        interval_secs: device_code.interval.unwrap_or(5).max(1),
+    })
+}
+
+fn poll_github_device_code_sign_in(
+    client_id: &str,
+    device_code: &str,
+) -> Result<NativeFirebaseDeviceCodePoll, String> {
+    let client_id = validated_public_oauth_client_id(client_id, "GitHub")?;
+    let normalized_device_code = device_code.trim();
+    if normalized_device_code.is_empty() {
+        return Err("GitHub device code is missing".to_string());
+    }
+    let client = build_mobile_sync_http_client()?;
+    let token_response = client
+        .post("https://github.com/login/oauth/access_token")
+        .header("Accept", "application/json")
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(encode_form_pairs(&[
+            ("client_id", client_id.as_str()),
+            ("device_code", normalized_device_code),
+            ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
+        ]))
+        .send()
+        .map_err(|error| format!("github token exchange failed: {}", error))?;
+
+    let status = token_response.status();
+    let payload = token_response
+        .json::<GithubTokenResponse>()
+        .map_err(|error| format!("invalid github token response: {}", error))?;
+
+    if status.is_success() {
+        let access_token = payload
+            .access_token
+            .filter(|value| !value.trim().is_empty())
+            .ok_or_else(|| "github token response missing access token".to_string())?;
+        return Ok(NativeFirebaseDeviceCodePoll {
+            status: "approved".to_string(),
+            access_token: Some(access_token),
+            id_token: None,
+            interval_secs: 0,
+        });
+    }
+
+    match payload.error.as_deref() {
+        Some("authorization_pending") => Ok(NativeFirebaseDeviceCodePoll {
+            status: "pending".to_string(),
+            access_token: None,
+            id_token: None,
+            interval_secs: 5,
+        }),
+        Some("slow_down") => Ok(NativeFirebaseDeviceCodePoll {
+            status: "pending".to_string(),
+            access_token: None,
+            id_token: None,
+            interval_secs: 10,
+        }),
+        Some("access_denied") => Err("GitHub sign-in was denied".to_string()),
+        Some("expired_token") => Err("GitHub sign-in expired before completion".to_string()),
+        Some(error_code) => Err(format!("GitHub sign-in failed: {}", error_code)),
+        None => Err(format!("GitHub sign-in failed with status {}", status)),
+    }
 }

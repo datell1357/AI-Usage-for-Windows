@@ -2,6 +2,7 @@ import { useShallow } from "zustand/react/shallow"
 import { OverviewPage } from "@/pages/overview"
 import { ProviderDetailPage } from "@/pages/provider-detail"
 import { SettingsPage } from "@/pages/settings"
+import type { NativeFirebaseDeviceCodeSession } from "@/lib/firebase"
 import type { DisplayPluginState } from "@/hooks/app/use-app-plugin-views"
 import type { SettingsPluginState } from "@/hooks/app/use-settings-plugin-list"
 import type { MobileSyncStatus } from "@/lib/mobile-sync"
@@ -35,6 +36,7 @@ export type AppContentActionProps = {
   mobileSyncStatus: MobileSyncStatus | null
   mobileSyncBusy: boolean
   mobileSyncError: string | null
+  mobileSyncPendingDeviceCodeAuth: NativeFirebaseDeviceCodeSession | null
   onMobileSyncGoogleSignIn: () => Promise<void> | void
   onMobileSyncGithubSignIn: () => Promise<void> | void
   onMobileSyncSyncNow: () => Promise<void> | void
@@ -61,6 +63,7 @@ export function AppContent({
   mobileSyncStatus,
   mobileSyncBusy,
   mobileSyncError,
+  mobileSyncPendingDeviceCodeAuth,
   onMobileSyncGoogleSignIn,
   onMobileSyncGithubSignIn,
   onMobileSyncSyncNow,
@@ -124,6 +127,7 @@ export function AppContent({
         mobileSyncStatus={mobileSyncStatus}
         mobileSyncBusy={mobileSyncBusy}
         mobileSyncError={mobileSyncError}
+        mobileSyncPendingDeviceCodeAuth={mobileSyncPendingDeviceCodeAuth}
         onMobileSyncGoogleSignIn={onMobileSyncGoogleSignIn}
         onMobileSyncGithubSignIn={onMobileSyncGithubSignIn}
         onMobileSyncSyncNow={onMobileSyncSyncNow}

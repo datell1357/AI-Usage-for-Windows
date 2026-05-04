@@ -32,6 +32,8 @@ export type MobileSyncAccount = {
 export type MobileSyncStatus = {
   isConfigured: boolean
   missingConfigKeys: string[]
+  googleSignInAvailable: boolean
+  githubSignInAvailable: boolean
   isAuthenticated: boolean
   account: MobileSyncAccount | null
   deviceId: string | null
@@ -79,6 +81,8 @@ function makeDefaultStatus(): MobileSyncStatus {
   return {
     isConfigured: runtime.enabled,
     missingConfigKeys: runtime.missingKeys,
+    googleSignInAvailable: runtime.enabled && runtime.googleClientConfigured,
+    githubSignInAvailable: runtime.enabled && runtime.githubClientConfigured,
     isAuthenticated: false,
     account: null,
     deviceId: null,
@@ -401,6 +405,8 @@ export function buildAuthenticatedMobileSyncStatus(
     ...previousStatus,
     isConfigured: runtime.enabled,
     missingConfigKeys: runtime.missingKeys,
+    googleSignInAvailable: runtime.enabled && runtime.googleClientConfigured,
+    githubSignInAvailable: runtime.enabled && runtime.githubClientConfigured,
     isAuthenticated: true,
     account: mapAccount(user),
     deviceId: ensuredDevice.deviceId,

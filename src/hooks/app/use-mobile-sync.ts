@@ -3,11 +3,14 @@ import { getVersion } from "@tauri-apps/api/app"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { PluginMeta } from "@/lib/plugin-types"
 import {
+  completeNativeDeviceCodeSignIn,
   initializeFirebaseAuthFlow,
-  signInWithGithub,
-  signInWithGoogle,
+  signInWithNativeTokens,
+  startGithubDeviceCodeSignIn,
+  startGoogleDeviceCodeSignIn,
   signOutFirebase,
   watchFirebaseUser,
+  type NativeFirebaseDeviceCodeSession,
 } from "@/lib/firebase"
 import {
   buildAuthenticatedMobileSyncStatus,
@@ -46,8 +49,11 @@ export function useMobileSync({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [currentUser, setCurrentUser] = useState<User | null>(null)
+  const [pendingDeviceCodeAuth, setPendingDeviceCodeAuth] =
+    useState<NativeFirebaseDeviceCodeSession | null>(null)
   const appVersionRef = useRef("0.2.0")
   const lastUploadedFingerprintRef = useRef<string | null>(null)
+  const authAbortControllerRef = useRef<AbortController | null>(null)
 
   const snapshot = useMemo(
     () =>
@@ -201,12 +207,20 @@ export function useMobileSync({
     setBusy(true)
     setError(null)
     try {
-      await signInWithGoogle()
+      const session = await startGoogleDeviceCodeSignIn()
+      setPendingDeviceCodeAuth(session)
+      authAbortControllerRef.current?.abort()
+      const controller = new AbortController()
+      authAbortControllerRef.current = controller
+      const tokens = await completeNativeDeviceCodeSignIn(session, controller.signal)
+      await signInWithNativeTokens(tokens)
     } catch (signInError) {
       console.error("Failed to sign in with Google:", signInError)
       setError(formatErrorMessage(signInError, "Failed to sign in with Google"))
       throw signInError
     } finally {
+      authAbortControllerRef.current = null
+      setPendingDeviceCodeAuth(null)
       setBusy(false)
     }
   }, [])
@@ -215,12 +229,20 @@ export function useMobileSync({
     setBusy(true)
     setError(null)
     try {
-      await signInWithGithub()
+      const session = await startGithubDeviceCodeSignIn()
+      setPendingDeviceCodeAuth(session)
+      authAbortControllerRef.current?.abort()
+      const controller = new AbortController()
+      authAbortControllerRef.current = controller
+      const tokens = await completeNativeDeviceCodeSignIn(session, controller.signal)
+      await signInWithNativeTokens(tokens)
     } catch (signInError) {
       console.error("Failed to sign in with GitHub:", signInError)
       setError(formatErrorMessage(signInError, "Failed to sign in with GitHub"))
       throw signInError
     } finally {
+      authAbortControllerRef.current = null
+      setPendingDeviceCodeAuth(null)
       setBusy(false)
     }
   }, [])
@@ -346,10 +368,17 @@ export function useMobileSync({
     return () => window.clearInterval(interval)
   }, [currentUser, status, syncNow])
 
+  useEffect(() => {
+    return () => {
+      authAbortControllerRef.current?.abort()
+    }
+  }, [])
+
   return {
     mobileSyncStatus: status,
     mobileSyncBusy: busy,
     mobileSyncError: error,
+    mobileSyncPendingDeviceCodeAuth: pendingDeviceCodeAuth,
     handleMobileSyncGoogleSignIn: handleGoogleSignIn,
     handleMobileSyncGithubSignIn: handleGithubSignIn,
     handleMobileSyncSyncNow: handleSyncNow,

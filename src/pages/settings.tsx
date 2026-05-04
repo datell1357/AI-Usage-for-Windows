@@ -21,6 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { GlobalShortcutSection } from "@/components/global-shortcut-section";
 import type { MobileSyncStatus } from "@/lib/mobile-sync";
+import type { NativeFirebaseDeviceCodeSession } from "@/lib/firebase";
 import {
   AUTO_UPDATE_OPTIONS,
   DISPLAY_MODE_OPTIONS,
@@ -122,6 +123,7 @@ interface SettingsPageProps {
   mobileSyncStatus: MobileSyncStatus | null;
   mobileSyncBusy: boolean;
   mobileSyncError: string | null;
+  mobileSyncPendingDeviceCodeAuth: NativeFirebaseDeviceCodeSession | null;
   onMobileSyncGoogleSignIn: () => Promise<void> | void;
   onMobileSyncGithubSignIn: () => Promise<void> | void;
   onMobileSyncSyncNow: () => Promise<void> | void;
@@ -148,6 +150,7 @@ export function SettingsPage({
   mobileSyncStatus,
   mobileSyncBusy,
   mobileSyncError,
+  mobileSyncPendingDeviceCodeAuth,
   onMobileSyncGoogleSignIn,
   onMobileSyncGithubSignIn,
   onMobileSyncSyncNow,
@@ -350,6 +353,20 @@ export function SettingsPage({
             </div>
           )}
 
+          {mobileSyncStatus?.isConfigured &&
+          (!mobileSyncStatus.googleSignInAvailable || !mobileSyncStatus.githubSignInAvailable) ? (
+            <div className="space-y-1">
+              <p className="text-sm text-amber-600 dark:text-amber-400">
+                Native OAuth client IDs are missing for one or more sign-in providers.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Add {mobileSyncStatus.googleSignInAvailable ? "" : "VITE_GOOGLE_OAUTH_CLIENT_ID "}
+                {!mobileSyncStatus.googleSignInAvailable && !mobileSyncStatus.githubSignInAvailable ? "and " : ""}
+                {mobileSyncStatus.githubSignInAvailable ? "" : "VITE_GITHUB_OAUTH_CLIENT_ID"} to the Windows .env file.
+              </p>
+            </div>
+          ) : null}
+
           {mobileSyncStatus?.isAuthenticated ? (
             <div className="space-y-3">
               <div className="space-y-1">
@@ -422,12 +439,33 @@ export function SettingsPage({
                 Sign in with the same Firebase account used on Android. Devices under the same
                 uid connect automatically.
               </p>
+              {mobileSyncPendingDeviceCodeAuth ? (
+                <div className="rounded-md border bg-background px-3 py-3 space-y-2">
+                  <p className="text-sm font-medium">
+                    Finish {mobileSyncPendingDeviceCodeAuth.providerLabel} sign-in in your browser
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    If the browser page asks for a code, enter the one below.
+                  </p>
+                  <div className="rounded-md border border-dashed bg-muted px-3 py-2 text-center text-lg font-semibold tracking-[0.2em]">
+                    {mobileSyncPendingDeviceCodeAuth.userCode}
+                  </div>
+                  <a
+                    href={mobileSyncPendingDeviceCodeAuth.verificationUri}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-primary underline underline-offset-4"
+                  >
+                    Open verification page
+                  </a>
+                </div>
+              ) : null}
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
                   size="sm"
                   onClick={() => void onMobileSyncGoogleSignIn()}
-                  disabled={mobileSyncBusy || !mobileSyncStatus?.isConfigured}
+                  disabled={mobileSyncBusy || !mobileSyncStatus?.googleSignInAvailable}
                 >
                   {mobileSyncBusy ? "Signing in..." : "Sign In with Google"}
                 </Button>
@@ -436,7 +474,7 @@ export function SettingsPage({
                   size="sm"
                   variant="outline"
                   onClick={() => void onMobileSyncGithubSignIn()}
-                  disabled={mobileSyncBusy || !mobileSyncStatus?.isConfigured}
+                  disabled={mobileSyncBusy || !mobileSyncStatus?.githubSignInAvailable}
                 >
                   {mobileSyncBusy ? "Signing in..." : "Sign In with GitHub"}
                 </Button>

@@ -63,6 +63,8 @@ const defaultProps = {
   mobileSyncStatus: {
     isConfigured: true,
     missingConfigKeys: [],
+    googleSignInAvailable: true,
+    githubSignInAvailable: true,
     isAuthenticated: false,
     account: null,
     deviceId: "dev_test",
@@ -76,6 +78,7 @@ const defaultProps = {
   },
   mobileSyncBusy: false,
   mobileSyncError: null,
+  mobileSyncPendingDeviceCodeAuth: null,
   onMobileSyncGoogleSignIn: vi.fn(),
   onMobileSyncGithubSignIn: vi.fn(),
   onMobileSyncSyncNow: vi.fn(),
@@ -236,6 +239,49 @@ describe("SettingsPage", () => {
     expect(screen.getByText(/Sign in with the same Firebase account used on Android/i)).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Sign In with Google" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Sign In with GitHub" })).toBeInTheDocument()
+  })
+
+  it("shows the pending device code during native provider sign-in", () => {
+    render(
+      <SettingsPage
+        {...defaultProps}
+        mobileSyncPendingDeviceCodeAuth={{
+          providerId: "google.com",
+          providerLabel: "Google",
+          clientId: "google-client-id",
+          deviceCode: "device-code",
+          userCode: "ABCD-EFGH",
+          verificationUri: "https://example.com/device",
+          expiresInSecs: 900,
+          intervalSecs: 5,
+          startedAt: Date.now(),
+        }}
+      />
+    )
+
+    expect(screen.getByText(/Finish Google sign-in in your browser/i)).toBeInTheDocument()
+    expect(screen.getByText("ABCD-EFGH")).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Open verification page" })).toHaveAttribute(
+      "href",
+      "https://example.com/device"
+    )
+  })
+
+  it("disables provider sign-in buttons when native OAuth client IDs are missing", () => {
+    render(
+      <SettingsPage
+        {...defaultProps}
+        mobileSyncStatus={{
+          ...defaultProps.mobileSyncStatus,
+          googleSignInAvailable: false,
+          githubSignInAvailable: false,
+        }}
+      />
+    )
+
+    expect(screen.getByRole("button", { name: "Sign In with Google" })).toBeDisabled()
+    expect(screen.getByRole("button", { name: "Sign In with GitHub" })).toBeDisabled()
+    expect(screen.getByText(/Native OAuth client IDs are missing/i)).toBeInTheDocument()
   })
 
   it("renders device sync controls when signed in", () => {

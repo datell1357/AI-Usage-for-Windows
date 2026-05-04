@@ -5,9 +5,19 @@ This document describes the direct Firestore contract for AI Usage for Windows w
 ## Authentication
 
 - Windows signs in with Firebase Auth using Google or GitHub.
+- Windows obtains provider tokens through native OAuth device flow, then completes Firebase sign-in locally with `signInWithCredential`.
 - Android signs in with the same Firebase project.
 - The same Firebase account produces the same `uid`.
 - No pairing code is used.
+
+Required Windows environment variables for sign-in:
+
+- `VITE_FIREBASE_API_KEY`
+- `VITE_FIREBASE_AUTH_DOMAIN`
+- `VITE_FIREBASE_PROJECT_ID`
+- `VITE_FIREBASE_APP_ID`
+- `VITE_GOOGLE_OAUTH_CLIENT_ID`
+- `VITE_GITHUB_OAUTH_CLIENT_ID`
 
 ## Device identity
 

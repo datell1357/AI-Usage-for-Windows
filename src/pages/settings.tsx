@@ -357,12 +357,15 @@ export function SettingsPage({
           (!mobileSyncStatus.googleSignInAvailable || !mobileSyncStatus.githubSignInAvailable) ? (
             <div className="space-y-1">
               <p className="text-sm text-amber-600 dark:text-amber-400">
-                Native OAuth client IDs are missing for one or more sign-in providers.
+                Native OAuth provider settings are missing for one or more sign-in providers.
               </p>
               <p className="text-xs text-muted-foreground">
-                Add {mobileSyncStatus.googleSignInAvailable ? "" : "VITE_GOOGLE_OAUTH_CLIENT_ID "}
-                {!mobileSyncStatus.googleSignInAvailable && !mobileSyncStatus.githubSignInAvailable ? "and " : ""}
-                {mobileSyncStatus.githubSignInAvailable ? "" : "VITE_GITHUB_OAUTH_CLIENT_ID"} to the Windows .env file.
+                {!mobileSyncStatus.googleSignInAvailable
+                  ? "Google requires VITE_GOOGLE_OAUTH_CLIENT_ID and VITE_GOOGLE_OAUTH_CLIENT_SECRET. "
+                  : ""}
+                {!mobileSyncStatus.githubSignInAvailable
+                  ? "GitHub requires VITE_GITHUB_OAUTH_CLIENT_ID."
+                  : ""}
               </p>
             </div>
           ) : null}

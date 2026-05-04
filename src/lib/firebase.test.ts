@@ -70,6 +70,7 @@ describe("firebase native auth helpers", () => {
 
   it("signs in with Google using native device-flow tokens", async () => {
     vi.stubEnv("VITE_GOOGLE_OAUTH_CLIENT_ID", "google-client-id")
+    vi.stubEnv("VITE_GOOGLE_OAUTH_CLIENT_SECRET", "google-client-secret")
     state.invokeMock
       .mockResolvedValueOnce({
         providerId: "google.com",
@@ -99,7 +100,11 @@ describe("firebase native auth helpers", () => {
     )
     expect(state.invokeMock).toHaveBeenCalledWith(
       "firebase_poll_google_device_code_sign_in",
-      { clientId: "google-client-id", deviceCode: "google-device-code" }
+      {
+        clientId: "google-client-id",
+        clientSecret: "google-client-secret",
+        deviceCode: "google-device-code",
+      }
     )
     expect(state.googleCredentialMock).toHaveBeenCalledWith(
       "google-id-token",

@@ -17,6 +17,7 @@ Required Windows environment variables for sign-in:
 - `VITE_FIREBASE_PROJECT_ID`
 - `VITE_FIREBASE_APP_ID`
 - `VITE_GOOGLE_OAUTH_CLIENT_ID`
+- `VITE_GOOGLE_OAUTH_CLIENT_SECRET`
 - `VITE_GITHUB_OAUTH_CLIENT_ID`
 
 ## Device identity

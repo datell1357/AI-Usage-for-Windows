@@ -267,7 +267,7 @@ describe("SettingsPage", () => {
     )
   })
 
-  it("disables provider sign-in buttons when native OAuth client IDs are missing", () => {
+  it("disables provider sign-in buttons when native OAuth provider settings are missing", () => {
     render(
       <SettingsPage
         {...defaultProps}
@@ -281,7 +281,9 @@ describe("SettingsPage", () => {
 
     expect(screen.getByRole("button", { name: "Sign In with Google" })).toBeDisabled()
     expect(screen.getByRole("button", { name: "Sign In with GitHub" })).toBeDisabled()
-    expect(screen.getByText(/Native OAuth client IDs are missing/i)).toBeInTheDocument()
+    expect(screen.getByText(/Native OAuth provider settings are missing/i)).toBeInTheDocument()
+    expect(screen.getByText(/Google requires VITE_GOOGLE_OAUTH_CLIENT_ID and VITE_GOOGLE_OAUTH_CLIENT_SECRET/i)).toBeInTheDocument()
+    expect(screen.getByText(/GitHub requires VITE_GITHUB_OAUTH_CLIENT_ID/i)).toBeInTheDocument()
   })
 
   it("renders device sync controls when signed in", () => {

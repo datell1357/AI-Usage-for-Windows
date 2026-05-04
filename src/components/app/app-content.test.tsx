@@ -67,13 +67,11 @@ function createProps(): AppContentProps {
     mobileSyncStatus: null,
     mobileSyncBusy: false,
     mobileSyncError: null,
-    mobileSyncPendingDeviceCodeAuth: null,
     onMobileSyncGoogleSignIn: vi.fn(),
     onMobileSyncGithubSignIn: vi.fn(),
     onMobileSyncSyncNow: vi.fn(),
     onMobileSyncSignOut: vi.fn(),
     onMobileSyncSaveDeviceName: vi.fn(),
-    onMobileSyncSaveOAuthSettings: vi.fn(),
   }
 }
 

@@ -5,9 +5,7 @@ This document describes the direct Firestore contract for AI Usage for Windows w
 ## Authentication
 
 - Windows signs in with Firebase Auth using Google or GitHub.
-- Google uses desktop OAuth authorization code + PKCE with a loopback callback on `127.0.0.1`.
-- GitHub uses OAuth device flow and requires Device Flow to be enabled in the GitHub OAuth App settings.
-- Windows completes Firebase sign-in locally with `signInWithCredential`.
+- Windows uses the Firebase Web SDK provider flows (`signInWithPopup`, with `signInWithRedirect` as the popup-blocked fallback).
 - Android signs in with the same Firebase project.
 - The same Firebase account produces the same `uid`.
 - No pairing code is used.
@@ -18,18 +16,12 @@ Required Windows environment variables for sign-in:
 - `VITE_FIREBASE_AUTH_DOMAIN`
 - `VITE_FIREBASE_PROJECT_ID`
 - `VITE_FIREBASE_APP_ID`
-- `VITE_GOOGLE_DESKTOP_CLIENT_ID`
-- `VITE_GITHUB_OAUTH_CLIENT_ID`
 
-Google setup notes:
+Firebase setup notes:
 
-- Create a Google Cloud OAuth client of type `Desktop app`.
-- The Firebase web app config is still required for Firebase initialization, but its web client ID is not used for Windows desktop sign-in.
-
-GitHub setup notes:
-
-- Create a GitHub OAuth App and copy its `client_id`.
-- Enable `Device Flow` in the app settings before using Windows sign-in.
+- Enable Google and GitHub sign-in providers in Firebase Authentication.
+- Keep `VITE_FIREBASE_AUTH_DOMAIN` set to the Firebase auth domain for the same project.
+- For redirect fallback, make sure the app origin used by Tauri is allowed in Firebase Authentication authorized domains.
 
 ## Device identity
 

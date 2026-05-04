@@ -65,8 +65,6 @@ const defaultProps = {
     missingConfigKeys: [],
     googleSignInAvailable: true,
     githubSignInAvailable: true,
-    googleDesktopClientId: "",
-    githubClientId: "",
     isAuthenticated: false,
     account: null,
     deviceId: "dev_test",
@@ -80,13 +78,11 @@ const defaultProps = {
   },
   mobileSyncBusy: false,
   mobileSyncError: null,
-  mobileSyncPendingDeviceCodeAuth: null,
   onMobileSyncGoogleSignIn: vi.fn(),
   onMobileSyncGithubSignIn: vi.fn(),
   onMobileSyncSyncNow: vi.fn(),
   onMobileSyncSignOut: vi.fn(),
   onMobileSyncSaveDeviceName: vi.fn(),
-  onMobileSyncSaveOAuthSettings: vi.fn(),
 }
 
 afterEach(() => {
@@ -239,69 +235,14 @@ describe("SettingsPage", () => {
   it("renders mobile sync sign-in controls when no account is linked", () => {
     render(<SettingsPage {...defaultProps} />)
     expect(screen.getByText("Mobile Sync")).toBeInTheDocument()
-    expect(screen.getByLabelText("Google Desktop Client ID")).toBeInTheDocument()
-    expect(screen.getByLabelText("GitHub OAuth Client ID")).toBeInTheDocument()
+    expect(screen.queryByLabelText("Google Desktop Client ID")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("GitHub OAuth Client ID")).not.toBeInTheDocument()
     expect(screen.getByText(/Sign in with the same Firebase account used on Android/i)).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Sign In with Google" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Sign In with GitHub" })).toBeInTheDocument()
   })
 
-  it("shows the pending browser sign-in state during native provider sign-in", () => {
-    render(
-      <SettingsPage
-        {...defaultProps}
-        mobileSyncPendingDeviceCodeAuth={{
-          kind: "loopback",
-          providerId: "google.com",
-          providerLabel: "Google",
-          clientId: "google-client-id",
-          sessionId: "google-session",
-          authorizationUrl: "https://example.com/sign-in",
-          callbackUrl: "http://127.0.0.1:43123/oauth/callback",
-          expiresInSecs: 900,
-          startedAt: Date.now(),
-        }}
-      />
-    )
-
-    expect(screen.getByText(/Finish Google sign-in in your browser/i)).toBeInTheDocument()
-    expect(
-      screen.getByText(/Complete the sign-in page in your browser/i)
-    ).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: "Reopen sign-in page" })).toHaveAttribute(
-      "href",
-      "https://example.com/sign-in"
-    )
-  })
-
-  it("shows the pending GitHub device code when native OAuth needs browser verification", () => {
-    render(
-      <SettingsPage
-        {...defaultProps}
-        mobileSyncPendingDeviceCodeAuth={{
-          kind: "device_code",
-          providerId: "github.com",
-          providerLabel: "GitHub",
-          clientId: "github-client-id",
-          sessionId: "github-session",
-          verificationUri: "https://github.com/login/device",
-          userCode: "WDJB-MJHT",
-          pollIntervalSecs: 5,
-          expiresInSecs: 900,
-          startedAt: Date.now(),
-        }}
-      />
-    )
-
-    expect(screen.getByText(/Finish GitHub sign-in in your browser/i)).toBeInTheDocument()
-    expect(screen.getByText("WDJB-MJHT")).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: "Open verification page" })).toHaveAttribute(
-      "href",
-      "https://github.com/login/device"
-    )
-  })
-
-  it("disables provider sign-in buttons when native OAuth provider settings are missing", () => {
+  it("disables provider sign-in buttons when Firebase provider settings are missing", () => {
     render(
       <SettingsPage
         {...defaultProps}
@@ -315,9 +256,9 @@ describe("SettingsPage", () => {
 
     expect(screen.getByRole("button", { name: "Sign In with Google" })).toBeDisabled()
     expect(screen.getByRole("button", { name: "Sign In with GitHub" })).toBeEnabled()
-    expect(screen.getByText(/Native OAuth provider settings are missing/i)).toBeInTheDocument()
-    expect(screen.getByText(/Google requires VITE_GOOGLE_DESKTOP_CLIENT_ID or VITE_GOOGLE_OAUTH_CLIENT_ID/i)).toBeInTheDocument()
-    expect(screen.queryByText(/GitHub requires VITE_GITHUB_OAUTH_CLIENT_ID/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/Firebase sign-in provider settings are missing/i)).toBeInTheDocument()
+    expect(screen.getByText(/Enable Google in Firebase Authentication/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Enable GitHub in Firebase Authentication/i)).not.toBeInTheDocument()
   })
 
   it("renders device sync controls when signed in", () => {

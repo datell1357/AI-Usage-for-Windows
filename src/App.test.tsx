@@ -31,8 +31,6 @@ const state = vi.hoisted(() => ({
   saveMobileSyncDeviceIdMock: vi.fn(),
   loadMobileSyncDeviceNameMock: vi.fn(),
   saveMobileSyncDeviceNameMock: vi.fn(),
-  loadMobileSyncOAuthConfigMock: vi.fn(),
-  saveMobileSyncOAuthConfigMock: vi.fn(),
   autostartEnableMock: vi.fn(),
   autostartDisableMock: vi.fn(),
   autostartIsEnabledMock: vi.fn(),
@@ -61,7 +59,6 @@ const runtimeInfoState = vi.hoisted(() => ({
 
 const firebaseState = vi.hoisted(() => ({
   getFirebaseRuntimeStateMock: vi.fn(),
-  hydrateFirebaseAuthRuntimeConfigMock: vi.fn(),
   initializeFirebaseAuthFlowMock: vi.fn(),
   watchFirebaseUserMock: vi.fn(),
   signInWithGoogleMock: vi.fn(),
@@ -222,7 +219,6 @@ vi.mock("@/lib/runtime-info", () => ({
 
 vi.mock("@/lib/firebase", () => ({
   getFirebaseRuntimeState: firebaseState.getFirebaseRuntimeStateMock,
-  hydrateFirebaseAuthRuntimeConfig: firebaseState.hydrateFirebaseAuthRuntimeConfigMock,
   initializeFirebaseAuthFlow: firebaseState.initializeFirebaseAuthFlowMock,
   watchFirebaseUser: firebaseState.watchFirebaseUserMock,
   signInWithGoogle: firebaseState.signInWithGoogleMock,
@@ -278,8 +274,6 @@ vi.mock("@/lib/settings", async () => {
     saveMobileSyncDeviceId: state.saveMobileSyncDeviceIdMock,
     loadMobileSyncDeviceName: state.loadMobileSyncDeviceNameMock,
     saveMobileSyncDeviceName: state.saveMobileSyncDeviceNameMock,
-    loadMobileSyncOAuthConfig: state.loadMobileSyncOAuthConfigMock,
-    saveMobileSyncOAuthConfig: state.saveMobileSyncOAuthConfigMock,
   }
 })
 
@@ -331,14 +325,11 @@ describe("App", () => {
     state.saveMobileSyncDeviceIdMock.mockReset()
     state.loadMobileSyncDeviceNameMock.mockReset()
     state.saveMobileSyncDeviceNameMock.mockReset()
-    state.loadMobileSyncOAuthConfigMock.mockReset()
-    state.saveMobileSyncOAuthConfigMock.mockReset()
     state.autostartEnableMock.mockReset()
     state.autostartDisableMock.mockReset()
     state.autostartIsEnabledMock.mockReset()
     runtimeInfoState.loadRuntimeInfoMock.mockReset()
     firebaseState.getFirebaseRuntimeStateMock.mockReset()
-    firebaseState.hydrateFirebaseAuthRuntimeConfigMock.mockReset()
     firebaseState.initializeFirebaseAuthFlowMock.mockReset()
     firebaseState.watchFirebaseUserMock.mockReset()
     firebaseState.signInWithGoogleMock.mockReset()
@@ -375,7 +366,6 @@ describe("App", () => {
       googleClientConfigured: true,
       githubClientConfigured: false,
     })
-    firebaseState.hydrateFirebaseAuthRuntimeConfigMock.mockImplementation(() => undefined)
     firebaseState.initializeFirebaseAuthFlowMock.mockResolvedValue(null)
     firebaseState.watchFirebaseUserMock.mockImplementation(() => () => undefined)
     firebaseState.signInWithGoogleMock.mockResolvedValue(undefined)
@@ -400,11 +390,6 @@ describe("App", () => {
     state.saveMobileSyncDeviceIdMock.mockResolvedValue(undefined)
     state.loadMobileSyncDeviceNameMock.mockResolvedValue("Windows PC")
     state.saveMobileSyncDeviceNameMock.mockResolvedValue(undefined)
-    state.loadMobileSyncOAuthConfigMock.mockResolvedValue({
-      googleDesktopClientId: null,
-      githubClientId: null,
-    })
-    state.saveMobileSyncOAuthConfigMock.mockResolvedValue(undefined)
     state.autostartEnableMock.mockResolvedValue(undefined)
     state.autostartDisableMock.mockResolvedValue(undefined)
     state.autostartIsEnabledMock.mockResolvedValue(false)

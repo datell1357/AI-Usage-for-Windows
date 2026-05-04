@@ -3,15 +3,11 @@ import { getVersion } from "@tauri-apps/api/app"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { PluginMeta } from "@/lib/plugin-types"
 import {
-  completeNativeBrowserSignIn,
-  hydrateFirebaseAuthRuntimeConfig,
   initializeFirebaseAuthFlow,
-  signInWithNativeTokens,
-  startGithubBrowserSignIn,
-  startGoogleBrowserSignIn,
+  signInWithGithub,
+  signInWithGoogle,
   signOutFirebase,
   watchFirebaseUser,
-  type NativeFirebasePendingAuthSession,
 } from "@/lib/firebase"
 import {
   buildAuthenticatedMobileSyncStatus,
@@ -24,8 +20,6 @@ import {
   type MobileSyncStatus,
 } from "@/lib/mobile-sync"
 import {
-  loadMobileSyncOAuthConfig,
-  saveMobileSyncOAuthConfig,
   type PluginSettings,
 } from "@/lib/settings"
 import type { PluginState } from "@/hooks/app/types"
@@ -54,11 +48,8 @@ export function useMobileSync({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [currentUser, setCurrentUser] = useState<User | null>(null)
-  const [pendingBrowserAuth, setPendingBrowserAuth] =
-    useState<NativeFirebasePendingAuthSession | null>(null)
   const appVersionRef = useRef("0.2.0")
   const lastUploadedFingerprintRef = useRef<string | null>(null)
-  const authAbortControllerRef = useRef<AbortController | null>(null)
 
   const snapshot = useMemo(
     () =>
@@ -124,11 +115,7 @@ export function useMobileSync({
         console.error("Failed to load app version for Mobile Sync:", versionError)
       })
 
-    void loadMobileSyncOAuthConfig()
-      .then((oauthConfig) => {
-        hydrateFirebaseAuthRuntimeConfig(oauthConfig)
-        return getInitialMobileSyncStatus()
-      })
+    void getInitialMobileSyncStatus()
       .then((initialStatus) => {
         if (!cancelled) {
           setStatus(initialStatus)
@@ -216,20 +203,12 @@ export function useMobileSync({
     setBusy(true)
     setError(null)
     try {
-      const session = await startGoogleBrowserSignIn()
-      setPendingBrowserAuth(session)
-      authAbortControllerRef.current?.abort()
-      const controller = new AbortController()
-      authAbortControllerRef.current = controller
-      const tokens = await completeNativeBrowserSignIn(session, controller.signal)
-      await signInWithNativeTokens(tokens)
+      await signInWithGoogle()
     } catch (signInError) {
       console.error("Failed to sign in with Google:", signInError)
       setError(formatErrorMessage(signInError, "Failed to sign in with Google"))
       throw signInError
     } finally {
-      authAbortControllerRef.current = null
-      setPendingBrowserAuth(null)
       setBusy(false)
     }
   }, [])
@@ -238,20 +217,12 @@ export function useMobileSync({
     setBusy(true)
     setError(null)
     try {
-      const session = await startGithubBrowserSignIn()
-      setPendingBrowserAuth(session)
-      authAbortControllerRef.current?.abort()
-      const controller = new AbortController()
-      authAbortControllerRef.current = controller
-      const tokens = await completeNativeBrowserSignIn(session, controller.signal)
-      await signInWithNativeTokens(tokens)
+      await signInWithGithub()
     } catch (signInError) {
       console.error("Failed to sign in with GitHub:", signInError)
       setError(formatErrorMessage(signInError, "Failed to sign in with GitHub"))
       throw signInError
     } finally {
-      authAbortControllerRef.current = null
-      setPendingBrowserAuth(null)
       setBusy(false)
     }
   }, [])
@@ -340,39 +311,6 @@ export function useMobileSync({
     [currentUser]
   )
 
-  const handleOAuthSettingsSave = useCallback(
-    async (googleDesktopClientId: string, githubClientId: string) => {
-      setBusy(true)
-      setError(null)
-      try {
-        const oauthConfig = { googleDesktopClientId, githubClientId }
-        await saveMobileSyncOAuthConfig(oauthConfig)
-        hydrateFirebaseAuthRuntimeConfig(oauthConfig)
-        const nextStatus = await getInitialMobileSyncStatus()
-        setStatus((currentStatus) =>
-          currentStatus
-            ? {
-                ...currentStatus,
-                isConfigured: nextStatus.isConfigured,
-                missingConfigKeys: nextStatus.missingConfigKeys,
-                googleSignInAvailable: nextStatus.googleSignInAvailable,
-                githubSignInAvailable: nextStatus.githubSignInAvailable,
-                googleDesktopClientId: nextStatus.googleDesktopClientId,
-                githubClientId: nextStatus.githubClientId,
-              }
-            : nextStatus
-        )
-      } catch (saveError) {
-        console.error("Failed to save Mobile Sync OAuth settings:", saveError)
-        setError(formatErrorMessage(saveError, "Failed to save OAuth settings"))
-        throw saveError
-      } finally {
-        setBusy(false)
-      }
-    },
-    []
-  )
-
   useEffect(() => {
     if (!currentUser || !status?.isAuthenticated || !status.syncEnabled) return
     if (busy) return
@@ -410,22 +348,14 @@ export function useMobileSync({
     return () => window.clearInterval(interval)
   }, [currentUser, status, syncNow])
 
-  useEffect(() => {
-    return () => {
-      authAbortControllerRef.current?.abort()
-    }
-  }, [])
-
   return {
     mobileSyncStatus: status,
     mobileSyncBusy: busy,
     mobileSyncError: error,
-    mobileSyncPendingDeviceCodeAuth: pendingBrowserAuth,
     handleMobileSyncGoogleSignIn: handleGoogleSignIn,
     handleMobileSyncGithubSignIn: handleGithubSignIn,
     handleMobileSyncSyncNow: handleSyncNow,
     handleMobileSyncSignOut: handleSignOut,
     handleMobileSyncSaveDeviceName: handleDeviceNameSave,
-    handleMobileSyncSaveOAuthSettings: handleOAuthSettingsSave,
   }
 }

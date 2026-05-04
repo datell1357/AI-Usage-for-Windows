@@ -2,7 +2,6 @@ import { useShallow } from "zustand/react/shallow"
 import { OverviewPage } from "@/pages/overview"
 import { ProviderDetailPage } from "@/pages/provider-detail"
 import { SettingsPage } from "@/pages/settings"
-import type { NativeFirebasePendingAuthSession } from "@/lib/firebase"
 import type { DisplayPluginState } from "@/hooks/app/use-app-plugin-views"
 import type { SettingsPluginState } from "@/hooks/app/use-settings-plugin-list"
 import type { MobileSyncStatus } from "@/lib/mobile-sync"
@@ -36,16 +35,11 @@ export type AppContentActionProps = {
   mobileSyncStatus: MobileSyncStatus | null
   mobileSyncBusy: boolean
   mobileSyncError: string | null
-  mobileSyncPendingDeviceCodeAuth: NativeFirebasePendingAuthSession | null
   onMobileSyncGoogleSignIn: () => Promise<void> | void
   onMobileSyncGithubSignIn: () => Promise<void> | void
   onMobileSyncSyncNow: () => Promise<void> | void
   onMobileSyncSignOut: () => Promise<void> | void
   onMobileSyncSaveDeviceName: (deviceName: string) => Promise<void> | void
-  onMobileSyncSaveOAuthSettings: (
-    googleDesktopClientId: string,
-    githubClientId: string
-  ) => Promise<void> | void
 }
 
 export type AppContentProps = AppContentDerivedProps & AppContentActionProps
@@ -67,13 +61,11 @@ export function AppContent({
   mobileSyncStatus,
   mobileSyncBusy,
   mobileSyncError,
-  mobileSyncPendingDeviceCodeAuth,
   onMobileSyncGoogleSignIn,
   onMobileSyncGithubSignIn,
   onMobileSyncSyncNow,
   onMobileSyncSignOut,
   onMobileSyncSaveDeviceName,
-  onMobileSyncSaveOAuthSettings,
 }: AppContentProps) {
   const { activeView } = useAppUiStore(
     useShallow((state) => ({
@@ -132,13 +124,11 @@ export function AppContent({
         mobileSyncStatus={mobileSyncStatus}
         mobileSyncBusy={mobileSyncBusy}
         mobileSyncError={mobileSyncError}
-        mobileSyncPendingDeviceCodeAuth={mobileSyncPendingDeviceCodeAuth}
         onMobileSyncGoogleSignIn={onMobileSyncGoogleSignIn}
         onMobileSyncGithubSignIn={onMobileSyncGithubSignIn}
         onMobileSyncSyncNow={onMobileSyncSyncNow}
         onMobileSyncSignOut={onMobileSyncSignOut}
         onMobileSyncSaveDeviceName={onMobileSyncSaveDeviceName}
-        onMobileSyncSaveOAuthSettings={onMobileSyncSaveOAuthSettings}
       />
     )
   }

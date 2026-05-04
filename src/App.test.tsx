@@ -59,6 +59,7 @@ const runtimeInfoState = vi.hoisted(() => ({
 
 const firebaseState = vi.hoisted(() => ({
   getFirebaseRuntimeStateMock: vi.fn(),
+  initializeFirebaseAuthFlowMock: vi.fn(),
   watchFirebaseUserMock: vi.fn(),
   signInWithGoogleMock: vi.fn(),
   signInWithGithubMock: vi.fn(),
@@ -218,6 +219,7 @@ vi.mock("@/lib/runtime-info", () => ({
 
 vi.mock("@/lib/firebase", () => ({
   getFirebaseRuntimeState: firebaseState.getFirebaseRuntimeStateMock,
+  initializeFirebaseAuthFlow: firebaseState.initializeFirebaseAuthFlowMock,
   watchFirebaseUser: firebaseState.watchFirebaseUserMock,
   signInWithGoogle: firebaseState.signInWithGoogleMock,
   signInWithGithub: firebaseState.signInWithGithubMock,
@@ -328,6 +330,7 @@ describe("App", () => {
     state.autostartIsEnabledMock.mockReset()
     runtimeInfoState.loadRuntimeInfoMock.mockReset()
     firebaseState.getFirebaseRuntimeStateMock.mockReset()
+    firebaseState.initializeFirebaseAuthFlowMock.mockReset()
     firebaseState.watchFirebaseUserMock.mockReset()
     firebaseState.signInWithGoogleMock.mockReset()
     firebaseState.signInWithGithubMock.mockReset()
@@ -361,6 +364,7 @@ describe("App", () => {
       enabled: true,
       missingKeys: [],
     })
+    firebaseState.initializeFirebaseAuthFlowMock.mockResolvedValue(null)
     firebaseState.watchFirebaseUserMock.mockImplementation(() => () => undefined)
     firebaseState.signInWithGoogleMock.mockResolvedValue(undefined)
     firebaseState.signInWithGithubMock.mockResolvedValue(undefined)

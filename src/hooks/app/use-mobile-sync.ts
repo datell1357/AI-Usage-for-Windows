@@ -3,6 +3,7 @@ import { getVersion } from "@tauri-apps/api/app"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { PluginMeta } from "@/lib/plugin-types"
 import {
+  initializeFirebaseAuthFlow,
   signInWithGithub,
   signInWithGoogle,
   signOutFirebase,
@@ -124,6 +125,13 @@ export function useMobileSync({
           setError("Failed to load Mobile Sync status")
         }
       })
+
+    void initializeFirebaseAuthFlow().catch((redirectError) => {
+      console.error("Failed to complete Firebase redirect sign-in:", redirectError)
+      if (!cancelled) {
+        setError(formatErrorMessage(redirectError, "Failed to complete sign-in"))
+      }
+    })
 
     let unsubscribe: (() => void) | undefined
 

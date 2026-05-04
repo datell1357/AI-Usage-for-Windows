@@ -1,14 +1,17 @@
 import { initializeApp, type FirebaseApp } from "firebase/app"
 import {
   browserLocalPersistence,
+  getRedirectResult,
   getAuth,
   GithubAuthProvider,
   GoogleAuthProvider,
   onAuthStateChanged,
   setPersistence,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
   type Auth,
+  type UserCredential,
   type Unsubscribe,
   type User,
 } from "firebase/auth"
@@ -106,6 +109,11 @@ async function ensureAuthPersistence(auth: Auth): Promise<void> {
   await persistencePromise
 }
 
+async function completeRedirectSignIn(auth: Auth): Promise<UserCredential | null> {
+  await ensureAuthPersistence(auth)
+  return getRedirectResult(auth)
+}
+
 function requiredServices(): FirebaseServices {
   const services = getFirebaseServices()
   if (!services) {
@@ -119,12 +127,26 @@ export function watchFirebaseUser(callback: (user: User | null) => void): Unsubs
   return onAuthStateChanged(services.auth, callback)
 }
 
+export async function initializeFirebaseAuthFlow(): Promise<UserCredential | null> {
+  const { auth } = requiredServices()
+  return completeRedirectSignIn(auth)
+}
+
 export async function signInWithGoogle(): Promise<User> {
   const { auth } = requiredServices()
   await ensureAuthPersistence(auth)
   const provider = new GoogleAuthProvider()
   provider.setCustomParameters({ prompt: "select_account" })
-  const result = await signInWithPopup(auth, provider)
+  let result: UserCredential
+  try {
+    result = await signInWithPopup(auth, provider)
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "auth/popup-blocked") {
+      await signInWithRedirect(auth, provider)
+      throw new Error("Redirecting to Google sign-in...")
+    }
+    throw error
+  }
   return result.user
 }
 
@@ -134,7 +156,16 @@ export async function signInWithGithub(): Promise<User> {
   const provider = new GithubAuthProvider()
   provider.addScope("read:user")
   provider.setCustomParameters({ allow_signup: "true" })
-  const result = await signInWithPopup(auth, provider)
+  let result: UserCredential
+  try {
+    result = await signInWithPopup(auth, provider)
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "auth/popup-blocked") {
+      await signInWithRedirect(auth, provider)
+      throw new Error("Redirecting to GitHub sign-in...")
+    }
+    throw error
+  }
   return result.user
 }
 

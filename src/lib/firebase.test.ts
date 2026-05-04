@@ -162,4 +162,15 @@ describe("firebase native auth helpers", () => {
       githubClientConfigured: false,
     })
   })
+
+  it("keeps Google sign-in available for existing VITE_GOOGLE_OAUTH_CLIENT_ID builds", async () => {
+    vi.stubEnv("VITE_GOOGLE_OAUTH_CLIENT_ID", "legacy-google-client-id")
+
+    const { getFirebaseRuntimeState } = await import("@/lib/firebase")
+    expect(getFirebaseRuntimeState()).toMatchObject({
+      enabled: true,
+      googleClientConfigured: true,
+      githubClientConfigured: false,
+    })
+  })
 })

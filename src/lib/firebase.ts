@@ -113,7 +113,8 @@ function normalizePublicClientId(value: string | null | undefined): string | nul
 function getGoogleDesktopClientId(): string | null {
   return (
     runtimeOAuthConfig.googleDesktopClientId ??
-    normalizePublicClientId(import.meta.env.VITE_GOOGLE_DESKTOP_CLIENT_ID)
+    normalizePublicClientId(import.meta.env.VITE_GOOGLE_DESKTOP_CLIENT_ID) ??
+    normalizePublicClientId(import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID)
   )
 }
 

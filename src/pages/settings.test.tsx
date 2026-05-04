@@ -256,9 +256,9 @@ describe("SettingsPage", () => {
 
     expect(screen.getByRole("button", { name: "Sign In with Google" })).toBeDisabled()
     expect(screen.getByRole("button", { name: "Sign In with GitHub" })).toBeEnabled()
-    expect(screen.getByText(/Firebase sign-in provider settings are missing/i)).toBeInTheDocument()
-    expect(screen.getByText(/Enable Google in Firebase Authentication/i)).toBeInTheDocument()
-    expect(screen.queryByText(/Enable GitHub in Firebase Authentication/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/Native OAuth provider settings are missing/i)).toBeInTheDocument()
+    expect(screen.getByText(/Google requires VITE_GOOGLE_DESKTOP_CLIENT_ID/i)).toBeInTheDocument()
+    expect(screen.queryByText(/GitHub requires VITE_GITHUB_OAUTH_CLIENT_ID/i)).not.toBeInTheDocument()
   })
 
   it("renders device sync controls when signed in", () => {

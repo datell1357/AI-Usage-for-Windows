@@ -21,6 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { GlobalShortcutSection } from "@/components/global-shortcut-section";
 import type { MobileSyncStatus } from "@/lib/mobile-sync";
+import type { NativeFirebasePendingAuthSession } from "@/lib/firebase";
 import {
   AUTO_UPDATE_OPTIONS,
   DISPLAY_MODE_OPTIONS,
@@ -122,6 +123,7 @@ interface SettingsPageProps {
   mobileSyncStatus: MobileSyncStatus | null;
   mobileSyncBusy: boolean;
   mobileSyncError: string | null;
+  mobileSyncPendingDeviceCodeAuth: NativeFirebasePendingAuthSession | null;
   onMobileSyncGoogleSignIn: () => Promise<void> | void;
   onMobileSyncGithubSignIn: () => Promise<void> | void;
   onMobileSyncSyncNow: () => Promise<void> | void;
@@ -148,6 +150,7 @@ export function SettingsPage({
   mobileSyncStatus,
   mobileSyncBusy,
   mobileSyncError,
+  mobileSyncPendingDeviceCodeAuth,
   onMobileSyncGoogleSignIn,
   onMobileSyncGithubSignIn,
   onMobileSyncSyncNow,
@@ -337,7 +340,6 @@ export function SettingsPage({
           Sync this Windows device directly to Firebase for the mobile app
         </p>
         <div className="rounded-lg border bg-muted/50 p-3 space-y-3">
-
           {!mobileSyncStatus?.isConfigured && (
             <div className="space-y-1">
               <p className="text-sm text-amber-600 dark:text-amber-400">
@@ -355,14 +357,14 @@ export function SettingsPage({
           (!mobileSyncStatus.googleSignInAvailable || !mobileSyncStatus.githubSignInAvailable) ? (
             <div className="space-y-1">
               <p className="text-sm text-amber-600 dark:text-amber-400">
-                Firebase sign-in provider settings are missing for one or more providers.
+                Native OAuth provider settings are missing for one or more sign-in providers.
               </p>
               <p className="text-xs text-muted-foreground">
                 {!mobileSyncStatus.googleSignInAvailable
-                  ? "Enable Google in Firebase Authentication. "
+                  ? "Google requires VITE_GOOGLE_DESKTOP_CLIENT_ID or VITE_GOOGLE_OAUTH_CLIENT_ID. "
                   : ""}
                 {!mobileSyncStatus.githubSignInAvailable
-                  ? "Enable GitHub in Firebase Authentication."
+                  ? "GitHub requires VITE_GITHUB_OAUTH_CLIENT_ID."
                   : ""}
               </p>
             </div>
@@ -440,6 +442,46 @@ export function SettingsPage({
                 Sign in with the same Firebase account used on Android. Devices under the same
                 uid connect automatically.
               </p>
+              {mobileSyncPendingDeviceCodeAuth ? (
+                <div className="rounded-md border bg-background px-3 py-3 space-y-2">
+                  <p className="text-sm font-medium">
+                    Finish {mobileSyncPendingDeviceCodeAuth.providerLabel} sign-in in your browser
+                  </p>
+                  {mobileSyncPendingDeviceCodeAuth.kind === "device_code" ? (
+                    <>
+                      <p className="text-xs text-muted-foreground">
+                        Enter the verification code below in your browser, then return here.
+                      </p>
+                      <div className="rounded-md border border-dashed bg-muted px-3 py-2 text-center text-lg font-semibold tracking-[0.2em]">
+                        {mobileSyncPendingDeviceCodeAuth.userCode}
+                      </div>
+                      <a
+                        href={mobileSyncPendingDeviceCodeAuth.verificationUri}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-primary underline underline-offset-4"
+                      >
+                        Open verification page
+                      </a>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs text-muted-foreground">
+                        Complete the sign-in page in your browser. The app will continue
+                        automatically after the browser redirects back to this Windows device.
+                      </p>
+                      <a
+                        href={mobileSyncPendingDeviceCodeAuth.authorizationUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-primary underline underline-offset-4"
+                      >
+                        Reopen sign-in page
+                      </a>
+                    </>
+                  )}
+                </div>
+              ) : null}
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"

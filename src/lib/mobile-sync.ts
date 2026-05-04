@@ -80,6 +80,37 @@ type BuildMobileSyncSnapshotArgs = {
   pluginStates: Record<string, PluginState>
 }
 
+type FirestoreValue =
+  | null
+  | string
+  | number
+  | boolean
+  | FirestoreValue[]
+  | { [key: string]: FirestoreValue }
+
+function stripUndefinedForFirestore(value: unknown): FirestoreValue {
+  if (value === undefined) return null
+  if (value === null) return null
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return value
+  }
+  if (Array.isArray(value)) {
+    return value.map(stripUndefinedForFirestore)
+  }
+  if (typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, entryValue]) => entryValue !== undefined)
+        .map(([key, entryValue]) => [key, stripUndefinedForFirestore(entryValue)])
+    )
+  }
+  return null
+}
+
+function stripUndefinedObjectForFirestore(value: Record<string, unknown>): Record<string, unknown> {
+  return stripUndefinedForFirestore(value) as Record<string, unknown>
+}
+
 function makeDefaultStatus(oauthConfig?: {
   googleDesktopClientId: string | null
   githubClientId: string | null
@@ -272,7 +303,7 @@ export async function ensureMobileSyncDevice(
   await Promise.all([
     setDoc(
       userRef,
-      {
+      stripUndefinedObjectForFirestore({
         uid: user.uid,
         email: user.email ?? null,
         displayName: user.displayName ?? null,
@@ -280,22 +311,22 @@ export async function ensureMobileSyncDevice(
         createdAt:
           typeof existingUser?.createdAt === "string" ? existingUser.createdAt : now,
         updatedAt: now,
-      },
+      }),
       { merge: true }
     ),
     setDoc(
       deviceRef,
-      {
+      stripUndefinedObjectForFirestore({
         deviceId,
         name: deviceName,
         platform: "windows",
         appName: APP_NAME,
-        appVersion,
+        appVersion: appVersion || "0.2.0",
         linkedAt,
         lastSeenAt: typeof existingDevice?.lastSeenAt === "string" ? existingDevice.lastSeenAt : null,
         syncEnabled: existingDevice?.syncEnabled !== false,
         revokedAt: existingDevice?.revokedAt ?? null,
-      },
+      }),
       { merge: true }
     ),
   ])
@@ -328,7 +359,11 @@ export async function writeMobileSyncDeviceName(
 
   const ensured = await ensureMobileSyncDevice(user, appVersion)
   const deviceRef = doc(services.db, "users", user.uid, "devices", ensured.deviceId)
-  await setDoc(deviceRef, { name: trimmedName, appVersion }, { merge: true })
+  await setDoc(
+    deviceRef,
+    stripUndefinedObjectForFirestore({ name: trimmedName, appVersion: appVersion || "0.2.0" }),
+    { merge: true }
+  )
 
   return {
     ...ensured,
@@ -366,22 +401,22 @@ export async function uploadMobileSyncSnapshot(
   await Promise.all([
     setDoc(
       deviceRef,
-      {
+      stripUndefinedObjectForFirestore({
         name: ensured.deviceName,
-        appVersion,
+        appVersion: appVersion || "0.2.0",
         lastSeenAt: now,
         syncEnabled: true,
         revokedAt: null,
-      },
+      }),
       { merge: true }
     ),
     setDoc(
       snapshotRef,
-      {
+      stripUndefinedObjectForFirestore({
         ...snapshot,
         uploadedAt: now,
         source: SNAPSHOT_SOURCE,
-      },
+      }),
       { merge: false }
     ),
   ])

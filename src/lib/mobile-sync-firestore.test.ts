@@ -168,6 +168,54 @@ describe("mobile sync firestore helpers", () => {
     )
   })
 
+  it("removes undefined values before writing Firestore documents", async () => {
+    firestoreState.getDocMock
+      .mockResolvedValueOnce(missingDocument())
+      .mockResolvedValueOnce(missingDocument())
+
+    const user = {
+      uid: "uid_123",
+      email: undefined,
+      displayName: undefined,
+      photoURL: undefined,
+      providerData: [{ providerId: "google.com" }],
+    } as any
+
+    await uploadMobileSyncSnapshot(user, undefined as unknown as string, {
+      schemaVersion: 1,
+      fetchedAt: "2026-04-30T00:00:00.000Z",
+      providers: [
+        {
+          providerId: "claude",
+          displayName: "Claude",
+          status: "ok",
+          plan: undefined as unknown as null,
+          fetchedAt: null,
+          lines: [
+            {
+              type: "text",
+              label: "Usage",
+              value: "10",
+              subtitle: undefined,
+            } as any,
+          ],
+          error: null,
+        },
+      ],
+    })
+
+    const writtenPayloads = firestoreState.setDocMock.mock.calls.map((call) => call[1])
+    expect(JSON.stringify(writtenPayloads)).not.toContain("undefined")
+    expect(writtenPayloads[0]).toMatchObject({
+      uid: "uid_123",
+      email: null,
+      displayName: null,
+    })
+    const snapshotPayload = writtenPayloads.find((payload) => Array.isArray(payload.providers))
+    expect(snapshotPayload.providers[0]).not.toHaveProperty("plan")
+    expect(snapshotPayload.providers[0].lines[0]).not.toHaveProperty("subtitle")
+  })
+
   it("updates the device name locally and in Firestore", async () => {
     firestoreState.getDocMock
       .mockResolvedValueOnce(missingDocument())

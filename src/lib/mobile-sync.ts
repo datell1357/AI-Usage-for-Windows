@@ -33,6 +33,7 @@ export type MobileSyncAccount = {
 export type MobileSyncStatus = {
   isConfigured: boolean
   missingConfigKeys: string[]
+  missingOAuthKeys: string[]
   googleSignInAvailable: boolean
   githubSignInAvailable: boolean
   googleDesktopClientId: string
@@ -84,10 +85,11 @@ function makeDefaultStatus(oauthConfig?: {
   githubClientId: string | null
 }): MobileSyncStatus {
   const runtime = getFirebaseRuntimeState()
-  return {
-    isConfigured: runtime.enabled,
-    missingConfigKeys: runtime.missingKeys,
-    googleSignInAvailable: runtime.enabled && runtime.googleClientConfigured,
+    return {
+      isConfigured: runtime.enabled,
+      missingConfigKeys: runtime.missingKeys,
+      missingOAuthKeys: runtime.missingOAuthKeys,
+      googleSignInAvailable: runtime.enabled && runtime.googleClientConfigured,
     githubSignInAvailable: runtime.enabled && runtime.githubClientConfigured,
     googleDesktopClientId: oauthConfig?.googleDesktopClientId ?? "",
     githubClientId: oauthConfig?.githubClientId ?? "",
@@ -416,6 +418,7 @@ export function buildAuthenticatedMobileSyncStatus(
     ...previousStatus,
     isConfigured: runtime.enabled,
     missingConfigKeys: runtime.missingKeys,
+    missingOAuthKeys: runtime.missingOAuthKeys,
     googleSignInAvailable: runtime.enabled && runtime.googleClientConfigured,
     githubSignInAvailable: runtime.enabled && runtime.githubClientConfigured,
     isAuthenticated: true,

@@ -70,6 +70,7 @@ describe("firebase auth helpers", () => {
     vi.stubEnv("VITE_FIREBASE_PROJECT_ID", "ai-usage-for-mobile")
     vi.stubEnv("VITE_FIREBASE_APP_ID", "firebase-app-id")
     vi.stubEnv("VITE_GOOGLE_DESKTOP_CLIENT_ID", "google-desktop-client-id")
+    vi.stubEnv("VITE_GOOGLE_DESKTOP_CLIENT_SECRET", "google-desktop-client-secret")
     vi.stubEnv("VITE_GITHUB_OAUTH_CLIENT_ID", "github-client-id")
 
     state.initializeAppMock.mockReturnValue({ id: "app" })
@@ -102,6 +103,7 @@ describe("firebase auth helpers", () => {
 
     expect(state.invokeMock).toHaveBeenCalledWith("firebase_start_google_loopback_sign_in", {
       clientId: "google-desktop-client-id",
+      clientSecret: "google-desktop-client-secret",
     })
   })
 

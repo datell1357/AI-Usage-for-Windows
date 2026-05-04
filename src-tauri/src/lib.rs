@@ -105,6 +105,7 @@ struct NativeFirebaseLoopbackAuthSession {
     provider_id: String,
     flow: String,
     client_id: String,
+    client_secret: Option<String>,
     callback_url: Option<String>,
     state: Option<String>,
     code_verifier: Option<String>,
@@ -723,8 +724,9 @@ fn mobile_sync_unlink_device(app_handle: tauri::AppHandle) -> Result<MobileSyncS
 #[tauri::command]
 fn firebase_start_google_loopback_sign_in(
     client_id: String,
+    client_secret: String,
 ) -> Result<NativeFirebaseLoopbackAuthStart, String> {
-    start_google_loopback_sign_in(&client_id)
+    start_google_loopback_sign_in(&client_id, &client_secret)
 }
 
 #[tauri::command]
@@ -1086,6 +1088,17 @@ fn validated_public_oauth_client_id(client_id: &str, provider_name: &str) -> Res
     Ok(trimmed.to_string())
 }
 
+fn validated_oauth_client_secret(client_secret: &str, provider_name: &str) -> Result<String, String> {
+    let trimmed = client_secret.trim();
+    if trimmed.is_empty() {
+        return Err(format!("{provider_name} OAuth client secret is not configured on this Windows device"));
+    }
+    if trimmed.len() > 512 || trimmed.contains(char::is_whitespace) {
+        return Err(format!("{provider_name} OAuth client secret is invalid"));
+    }
+    Ok(trimmed.to_string())
+}
+
 fn open_external_browser(url: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
@@ -1125,8 +1138,16 @@ fn encode_form_pairs(pairs: &[(&str, &str)]) -> String {
         .join("&")
 }
 
-fn start_google_loopback_sign_in(client_id: &str) -> Result<NativeFirebaseLoopbackAuthStart, String> {
-    start_loopback_sign_in(client_id, "Google", "google.com")
+fn start_google_loopback_sign_in(
+    client_id: &str,
+    client_secret: &str,
+) -> Result<NativeFirebaseLoopbackAuthStart, String> {
+    start_loopback_sign_in(
+        client_id,
+        Some(client_secret),
+        "Google",
+        "google.com",
+    )
 }
 
 fn start_github_loopback_sign_in(client_id: &str) -> Result<NativeFirebaseLoopbackAuthStart, String> {
@@ -1135,10 +1156,14 @@ fn start_github_loopback_sign_in(client_id: &str) -> Result<NativeFirebaseLoopba
 
 fn start_loopback_sign_in(
     client_id: &str,
+    client_secret: Option<&str>,
     provider_name: &str,
     provider_id: &str,
 ) -> Result<NativeFirebaseLoopbackAuthStart, String> {
     let client_id = validated_public_oauth_client_id(client_id, provider_name)?;
+    let client_secret = client_secret
+        .map(|secret| validated_oauth_client_secret(secret, provider_name))
+        .transpose()?;
     let listener = TcpListener::bind("127.0.0.1:0")
         .map_err(|error| format!("failed to reserve local OAuth callback port: {}", error))?;
     let local_addr = listener
@@ -1160,6 +1185,7 @@ fn start_loopback_sign_in(
         provider_id: provider_id.to_string(),
         flow: "loopback".to_string(),
         client_id: client_id.clone(),
+        client_secret,
         callback_url: Some(callback_url.clone()),
         state: Some(state.clone()),
         code_verifier: Some(code_verifier.clone()),
@@ -1244,6 +1270,7 @@ fn start_github_device_sign_in(client_id: &str) -> Result<NativeFirebaseLoopback
         provider_id: "github.com".to_string(),
         flow: "device_code".to_string(),
         client_id,
+        client_secret: None,
         callback_url: None,
         state: None,
         code_verifier: None,
@@ -1601,6 +1628,7 @@ fn handle_loopback_callback_connection(
     match exchange_provider_auth_code(
         &session.provider_id,
         client_id,
+        session.client_secret.as_deref(),
         session.callback_url.as_deref(),
         session.code_verifier.as_deref(),
         &code,
@@ -1694,6 +1722,7 @@ fn write_loopback_html_response(
 fn exchange_provider_auth_code(
     provider_id: &str,
     client_id: &str,
+    client_secret: Option<&str>,
     callback_url: Option<&str>,
     code_verifier: Option<&str>,
     code: &str,
@@ -1701,6 +1730,7 @@ fn exchange_provider_auth_code(
     match provider_id {
         "google.com" => exchange_google_auth_code(
             client_id,
+            client_secret.ok_or_else(|| "Google sign-in client secret was missing".to_string())?,
             callback_url.ok_or_else(|| "Google sign-in callback URL was missing".to_string())?,
             code_verifier.ok_or_else(|| "Google sign-in PKCE verifier was missing".to_string())?,
             code,
@@ -1717,6 +1747,7 @@ fn exchange_provider_auth_code(
 
 fn exchange_google_auth_code(
     client_id: &str,
+    client_secret: &str,
     callback_url: &str,
     code_verifier: &str,
     code: &str,
@@ -1727,6 +1758,7 @@ fn exchange_google_auth_code(
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(encode_form_pairs(&[
             ("client_id", client_id),
+            ("client_secret", client_secret),
             ("code", code),
             ("code_verifier", code_verifier),
             ("redirect_uri", callback_url),

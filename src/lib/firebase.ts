@@ -30,6 +30,7 @@ export type FirebaseRuntimeState = {
   missingKeys: string[]
   googleClientConfigured: boolean
   githubClientConfigured: boolean
+  missingOAuthKeys: string[]
 }
 
 type FirebaseServices = {
@@ -118,6 +119,10 @@ function getGoogleDesktopClientId(): string | null {
   )
 }
 
+function getGoogleDesktopClientSecret(): string | null {
+  return normalizePublicClientId(import.meta.env.VITE_GOOGLE_DESKTOP_CLIENT_SECRET)
+}
+
 function getGithubClientId(): string | null {
   return (
     runtimeOAuthConfig.githubClientId ??
@@ -158,12 +163,19 @@ function readFirebaseConfig(): { config: FirebaseConfig | null; missingKeys: str
 export function getFirebaseRuntimeState(): FirebaseRuntimeState {
   const { config, missingKeys } = readFirebaseConfig()
   const googleClientId = getGoogleDesktopClientId()
+  const googleClientSecret = getGoogleDesktopClientSecret()
   const githubClientId = getGithubClientId()
+  const missingOAuthKeys = [
+    googleClientId ? null : "VITE_GOOGLE_DESKTOP_CLIENT_ID",
+    googleClientSecret ? null : "VITE_GOOGLE_DESKTOP_CLIENT_SECRET",
+    githubClientId ? null : "VITE_GITHUB_OAUTH_CLIENT_ID",
+  ].filter((key): key is string => Boolean(key))
   return {
     enabled: Boolean(config),
     missingKeys,
-    googleClientConfigured: Boolean(googleClientId),
+    googleClientConfigured: Boolean(googleClientId && googleClientSecret),
     githubClientConfigured: Boolean(githubClientId),
+    missingOAuthKeys,
   }
 }
 
@@ -229,6 +241,14 @@ function requiredPublicClientId(
   return value
 }
 
+function requiredGoogleDesktopClientSecret(): string {
+  const value = getGoogleDesktopClientSecret()
+  if (!value) {
+    throw new Error("Google OAuth client secret is not configured on this Windows device")
+  }
+  return value
+}
+
 export async function signInWithNativeTokens(tokens: NativeFirebaseOAuthTokens): Promise<User> {
   const { auth } = requiredServices()
   await ensureAuthPersistence(auth)
@@ -250,8 +270,10 @@ export async function signInWithNativeTokens(tokens: NativeFirebaseOAuthTokens):
 
 export async function startGoogleBrowserSignIn(): Promise<NativeFirebasePendingAuthSession> {
   const clientId = requiredPublicClientId("VITE_GOOGLE_DESKTOP_CLIENT_ID", "Google")
+  const clientSecret = requiredGoogleDesktopClientSecret()
   const response = await invoke<NativeFirebaseLoopbackStart>("firebase_start_google_loopback_sign_in", {
     clientId,
+    clientSecret,
   })
   if (response.flow !== "loopback" || !response.authorizationUrl || !response.callbackUrl) {
     throw new Error("Google sign-in did not return a browser authorization session")

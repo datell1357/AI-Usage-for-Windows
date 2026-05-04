@@ -361,12 +361,17 @@ export function SettingsPage({
               </p>
               <p className="text-xs text-muted-foreground">
                 {!mobileSyncStatus.googleSignInAvailable
-                  ? "Google requires VITE_GOOGLE_DESKTOP_CLIENT_ID or VITE_GOOGLE_OAUTH_CLIENT_ID. "
+                  ? "Google requires VITE_GOOGLE_DESKTOP_CLIENT_ID and VITE_GOOGLE_DESKTOP_CLIENT_SECRET. "
                   : ""}
                 {!mobileSyncStatus.githubSignInAvailable
                   ? "GitHub requires VITE_GITHUB_OAUTH_CLIENT_ID."
                   : ""}
               </p>
+              {mobileSyncStatus.missingOAuthKeys?.length ? (
+                <p className="text-xs text-muted-foreground">
+                  Missing: {mobileSyncStatus.missingOAuthKeys.join(", ")}
+                </p>
+              ) : null}
             </div>
           ) : null}
 

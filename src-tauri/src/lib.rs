@@ -1288,6 +1288,11 @@ fn start_github_device_sign_in(client_id: &str) -> Result<NativeFirebaseLoopback
         sessions.insert(session_id.clone(), session);
     }
 
+    if let Err(error) = open_external_browser(&verification_uri) {
+        update_loopback_session_failed(&session_id, format!("failed to open browser: {}", error));
+        return Err(error);
+    }
+
     Ok(NativeFirebaseLoopbackAuthStart {
         provider_id: "github.com".to_string(),
         session_id,

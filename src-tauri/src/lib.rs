@@ -86,6 +86,8 @@ struct GithubDeviceCodeResponse {
     verification_uri: Option<String>,
     expires_in: Option<u64>,
     interval: Option<u64>,
+    error: Option<String>,
+    error_description: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -1247,7 +1249,16 @@ fn start_github_device_sign_in(client_id: &str) -> Result<NativeFirebaseLoopback
         .map_err(|error| format!("Invalid GitHub device authorization response: {}", error))?;
 
     if !status.is_success() {
-        return Err(format!("GitHub device authorization failed with status {}", status));
+        return Err(match (payload.error, payload.error_description) {
+            (Some(code), Some(description)) if !description.trim().is_empty() => {
+                format!(
+                    "GitHub device authorization failed: {} ({})",
+                    code, description
+                )
+            }
+            (Some(code), _) => format!("GitHub device authorization failed: {}", code),
+            _ => format!("GitHub device authorization failed with status {}", status),
+        });
     }
 
     let device_code = payload

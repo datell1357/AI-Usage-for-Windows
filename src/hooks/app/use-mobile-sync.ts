@@ -42,6 +42,18 @@ function formatErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message.trim().length > 0) {
     return error.message
   }
+  if (typeof error === "string" && error.trim().length > 0) {
+    return error.trim()
+  }
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string" &&
+    error.message.trim().length > 0
+  ) {
+    return error.message.trim()
+  }
   return fallback
 }
 

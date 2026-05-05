@@ -65,6 +65,7 @@ export type NativeFirebasePendingAuthSession =
       sessionId: string
       verificationUri: string
       userCode: string
+      codeCopiedToClipboard: boolean
       pollIntervalSecs: number
       expiresInSecs: number
       startedAt: number
@@ -78,6 +79,7 @@ type NativeFirebaseLoopbackStart = {
   callbackUrl?: string | null
   verificationUri?: string | null
   userCode?: string | null
+  codeCopiedToClipboard?: boolean | null
   expiresInSecs: number
   pollIntervalSecs?: number | null
 }
@@ -312,6 +314,7 @@ export async function startGithubBrowserSignIn(): Promise<NativeFirebasePendingA
     sessionId: response.sessionId,
     verificationUri: response.verificationUri,
     userCode: response.userCode,
+    codeCopiedToClipboard: Boolean(response.codeCopiedToClipboard),
     pollIntervalSecs: response.pollIntervalSecs,
     expiresInSecs: response.expiresInSecs,
     startedAt: Date.now(),

@@ -46,6 +46,7 @@ struct NativeFirebaseLoopbackAuthStart {
     callback_url: Option<String>,
     verification_uri: Option<String>,
     user_code: Option<String>,
+    code_copied_to_clipboard: bool,
     expires_in_secs: u64,
     poll_interval_secs: Option<u64>,
 }
@@ -1118,6 +1119,76 @@ fn open_external_browser(url: &str) -> Result<(), String> {
     }
 }
 
+fn copy_text_to_clipboard(text: &str) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        copy_text_to_windows_clipboard(text)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = text;
+        Err("clipboard copy is only implemented for Windows".to_string())
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn copy_text_to_windows_clipboard(text: &str) -> Result<(), String> {
+    use std::ptr::{copy_nonoverlapping, null_mut};
+    use windows_sys::Win32::Foundation::GlobalFree;
+    use windows_sys::Win32::System::DataExchange::{
+        CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
+    };
+    use windows_sys::Win32::System::Memory::{
+        GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE,
+    };
+    use windows_sys::Win32::System::Ole::CF_UNICODETEXT;
+
+    let mut wide: Vec<u16> = text.encode_utf16().collect();
+    wide.push(0);
+    let size_bytes = wide.len() * std::mem::size_of::<u16>();
+
+    unsafe {
+        let handle = GlobalAlloc(GMEM_MOVEABLE, size_bytes);
+        if handle.is_null() {
+            return Err("failed to allocate clipboard memory".to_string());
+        }
+
+        let locked = GlobalLock(handle) as *mut u16;
+        if locked.is_null() {
+            GlobalFree(handle);
+            return Err("failed to lock clipboard memory".to_string());
+        }
+
+        copy_nonoverlapping(wide.as_ptr(), locked, wide.len());
+        GlobalUnlock(handle);
+
+        if OpenClipboard(null_mut()) == 0 {
+            GlobalFree(handle);
+            return Err("failed to open clipboard".to_string());
+        }
+
+        let result = (|| {
+            if EmptyClipboard() == 0 {
+                return Err("failed to clear clipboard".to_string());
+            }
+            if SetClipboardData(CF_UNICODETEXT as u32, handle).is_null() {
+                return Err("failed to set clipboard data".to_string());
+            }
+            Ok(())
+        })();
+
+        let close_result = CloseClipboard();
+        if result.is_err() {
+            GlobalFree(handle);
+        }
+        if close_result == 0 {
+            return Err("failed to close clipboard".to_string());
+        }
+        result
+    }
+}
+
 fn encode_form_component(value: &str) -> String {
     let mut output = String::with_capacity(value.len());
     for byte in value.bytes() {
@@ -1224,6 +1295,7 @@ fn start_loopback_sign_in(
         callback_url: Some(callback_url),
         verification_uri: None,
         user_code: None,
+        code_copied_to_clipboard: false,
         expires_in_secs: FIREBASE_OAUTH_SESSION_TIMEOUT_SECS,
         poll_interval_secs: None,
     })
@@ -1276,6 +1348,7 @@ fn start_github_device_sign_in(client_id: &str) -> Result<NativeFirebaseLoopback
     let expires_in_secs = payload.expires_in.unwrap_or(FIREBASE_OAUTH_SESSION_TIMEOUT_SECS);
     let poll_interval_secs = payload.interval.unwrap_or(5);
     let session_id = Uuid::new_v4().to_string();
+    let code_copied_to_clipboard = copy_text_to_clipboard(&user_code).is_ok();
 
     let session = NativeFirebaseLoopbackAuthSession {
         provider_id: "github.com".to_string(),
@@ -1312,6 +1385,7 @@ fn start_github_device_sign_in(client_id: &str) -> Result<NativeFirebaseLoopback
         callback_url: None,
         verification_uri: Some(verification_uri),
         user_code: Some(user_code),
+        code_copied_to_clipboard,
         expires_in_secs,
         poll_interval_secs: Some(poll_interval_secs),
     })

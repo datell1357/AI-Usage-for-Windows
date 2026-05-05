@@ -457,6 +457,11 @@ export function SettingsPage({
                       <p className="text-xs text-muted-foreground">
                         Enter the verification code below in your browser, then return here.
                       </p>
+                      {mobileSyncPendingDeviceCodeAuth.codeCopiedToClipboard ? (
+                        <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                          Verification code copied to clipboard.
+                        </p>
+                      ) : null}
                       <div className="rounded-md border border-dashed bg-muted px-3 py-2 text-center text-lg font-semibold tracking-[0.2em]">
                         {mobileSyncPendingDeviceCodeAuth.userCode}
                       </div>

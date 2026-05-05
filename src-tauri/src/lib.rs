@@ -1518,38 +1518,36 @@ fn poll_github_device_code(
         .json::<GithubTokenResponse>()
         .map_err(|error| format!("Invalid GitHub device sign-in polling response: {}", error))?;
 
-    if status.is_success() {
+    let next_interval_secs = payload.interval.or(Some(current_interval_secs));
+    let outcome = if let Some(error_code) = payload.error.as_deref() {
+        match error_code {
+            "authorization_pending" => GithubDevicePollOutcome::Pending,
+            "slow_down" => GithubDevicePollOutcome::Pending,
+            "expired_token" | "token_expired" => GithubDevicePollOutcome::Failed {
+                message: "GitHub sign-in expired before completion".to_string(),
+            },
+            "access_denied" => GithubDevicePollOutcome::Failed {
+                message: "GitHub sign-in was cancelled in the browser".to_string(),
+            },
+            error_code => GithubDevicePollOutcome::Failed {
+                message: match payload.error_description {
+                    Some(description) if !description.trim().is_empty() => {
+                        format!("GitHub sign-in failed: {} ({})", error_code, description)
+                    }
+                    _ => format!("GitHub sign-in failed: {}", error_code),
+                },
+            },
+        }
+    } else if status.is_success() {
         let access_token = payload
             .access_token
             .filter(|value| !value.trim().is_empty())
             .ok_or_else(|| "GitHub token response missing access token".to_string())?;
-        return Ok(GithubDevicePollResult {
-            outcome: GithubDevicePollOutcome::Approved { access_token },
-            next_interval_secs: payload.interval,
-        });
-    }
-
-    let next_interval_secs = payload.interval.or(Some(current_interval_secs));
-    let outcome = match payload.error.as_deref() {
-        Some("authorization_pending") => GithubDevicePollOutcome::Pending,
-        Some("slow_down") => GithubDevicePollOutcome::Pending,
-        Some("expired_token") | Some("token_expired") => GithubDevicePollOutcome::Failed {
-            message: "GitHub sign-in expired before completion".to_string(),
-        },
-        Some("access_denied") => GithubDevicePollOutcome::Failed {
-            message: "GitHub sign-in was cancelled in the browser".to_string(),
-        },
-        Some(error_code) => GithubDevicePollOutcome::Failed {
-            message: match payload.error_description {
-                Some(description) if !description.trim().is_empty() => {
-                    format!("GitHub sign-in failed: {} ({})", error_code, description)
-                }
-                _ => format!("GitHub sign-in failed: {}", error_code),
-            },
-        },
-        None => GithubDevicePollOutcome::Failed {
+        GithubDevicePollOutcome::Approved { access_token }
+    } else {
+        GithubDevicePollOutcome::Failed {
             message: format!("GitHub sign-in failed with status {}", status),
-        },
+        }
     };
 
     Ok(GithubDevicePollResult {

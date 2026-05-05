@@ -1134,59 +1134,34 @@ fn copy_text_to_clipboard(text: &str) -> Result<(), String> {
 
 #[cfg(target_os = "windows")]
 fn copy_text_to_windows_clipboard(text: &str) -> Result<(), String> {
-    use std::ptr::{copy_nonoverlapping, null_mut};
-    use windows_sys::Win32::Foundation::GlobalFree;
-    use windows_sys::Win32::System::DataExchange::{
-        CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
-    };
-    use windows_sys::Win32::System::Memory::{
-        GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE,
-    };
-    use windows_sys::Win32::System::Ole::CF_UNICODETEXT;
+    use std::io::Write;
+    use std::process::{Command, Stdio};
 
-    let mut wide: Vec<u16> = text.encode_utf16().collect();
-    wide.push(0);
-    let size_bytes = wide.len() * std::mem::size_of::<u16>();
+    let mut child = Command::new("clip.exe")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|error| format!("failed to start clipboard helper: {}", error))?;
 
-    unsafe {
-        let handle = GlobalAlloc(GMEM_MOVEABLE, size_bytes);
-        if handle.is_null() {
-            return Err("failed to allocate clipboard memory".to_string());
-        }
-
-        let locked = GlobalLock(handle) as *mut u16;
-        if locked.is_null() {
-            GlobalFree(handle);
-            return Err("failed to lock clipboard memory".to_string());
-        }
-
-        copy_nonoverlapping(wide.as_ptr(), locked, wide.len());
-        GlobalUnlock(handle);
-
-        if OpenClipboard(null_mut()) == 0 {
-            GlobalFree(handle);
-            return Err("failed to open clipboard".to_string());
-        }
-
-        let result = (|| {
-            if EmptyClipboard() == 0 {
-                return Err("failed to clear clipboard".to_string());
-            }
-            if SetClipboardData(CF_UNICODETEXT as u32, handle).is_null() {
-                return Err("failed to set clipboard data".to_string());
-            }
-            Ok(())
-        })();
-
-        let close_result = CloseClipboard();
-        if result.is_err() {
-            GlobalFree(handle);
-        }
-        if close_result == 0 {
-            return Err("failed to close clipboard".to_string());
-        }
-        result
+    {
+        let stdin = child
+            .stdin
+            .as_mut()
+            .ok_or_else(|| "failed to open clipboard helper input".to_string())?;
+        stdin
+            .write_all(text.as_bytes())
+            .map_err(|error| format!("failed to write clipboard text: {}", error))?;
     }
+
+    let status = child
+        .wait()
+        .map_err(|error| format!("failed to wait for clipboard helper: {}", error))?;
+    if !status.success() {
+        return Err(format!("clipboard helper exited with status {}", status));
+    }
+
+    Ok(())
 }
 
 fn encode_form_component(value: &str) -> String {

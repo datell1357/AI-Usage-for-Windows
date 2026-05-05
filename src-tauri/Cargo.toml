@@ -1,6 +1,6 @@
 [package]
 name = "ai-usage"
-version = "0.2.0"
+version = "0.2.1"
 description = "AI Usage is an open source AI subscription limit tracker"
 authors = ["Yeoreum"]
 edition = "2024"
@@ -42,7 +42,7 @@ aes-gcm = "0.10.3"
 rusqlite = { version = "0.37", features = ["bundled"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Credentials", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_System_Ole"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Credentials"] }
 
 [dev-dependencies]
 serial_test = "3.4.0"

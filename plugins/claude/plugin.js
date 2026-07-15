@@ -452,6 +452,97 @@
     return mins + "m"
   }
 
+  function readNumberField(obj, names) {
+    if (!obj || typeof obj !== "object") return null
+    for (let i = 0; i < names.length; i++) {
+      const value = obj[names[i]]
+      if (typeof value === "number" && Number.isFinite(value)) return value
+    }
+    return null
+  }
+
+  function progressLabelExists(lines, label) {
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
+      if (line && line.type === "progress" && line.label === label) return true
+    }
+    return false
+  }
+
+  function addWeeklyPercentLine(lines, ctx, label, bucket) {
+    if (!bucket || typeof bucket !== "object") return
+    const utilization = readNumberField(bucket, [
+      "utilization",
+      "percent_used",
+      "percent",
+      "usage_percent",
+      "used_percent",
+      "percentage",
+    ])
+    if (utilization === null || progressLabelExists(lines, label)) return
+    lines.push(ctx.line.progress({
+      label,
+      used: utilization,
+      limit: 100,
+      format: { kind: "percent" },
+      resetsAt: ctx.util.toIso(bucket.resets_at || bucket.reset_at || bucket.resetsAt),
+      periodDurationMs: 7 * 24 * 60 * 60 * 1000 // 7 days
+    }))
+  }
+
+  function scopedLimitLabel(limit) {
+    if (!limit || typeof limit !== "object") return null
+    const scope = limit.scope && typeof limit.scope === "object" ? limit.scope : null
+    const model = scope && scope.model && typeof scope.model === "object" ? scope.model : null
+    const raw =
+      (model && (model.display_name || model.displayName || model.name)) ||
+      (scope && typeof scope.model === "string" ? scope.model : null) ||
+      (scope && (scope.display_name || scope.displayName || scope.name)) ||
+      limit.display_name ||
+      limit.displayName ||
+      limit.name ||
+      limit.label
+    if (typeof raw !== "string") return null
+    const label = raw.trim()
+    if (!label) return null
+    const lower = label.toLowerCase()
+    if (lower.indexOf("fable") !== -1) return "Fable"
+    if (lower.indexOf("sonnet") !== -1) return "Sonnet"
+    if (lower.indexOf("omelette") !== -1) return "Claude Design"
+    return label
+  }
+
+  function isWeeklyScopedLimit(limit) {
+    if (!limit || typeof limit !== "object") return false
+    const fields = [
+      limit.kind,
+      limit.type,
+      limit.limit_type,
+      limit.limitType,
+      limit.window,
+      limit.period,
+      limit.interval,
+    ]
+    for (let i = 0; i < fields.length; i++) {
+      const value = String(fields[i] || "").toLowerCase()
+      if (value === "weekly_scoped") return true
+      if (value.indexOf("weekly") !== -1 && value.indexOf("scoped") !== -1) return true
+    }
+    const duration = Number(limit.duration || (limit.window && limit.window.duration))
+    return Number.isFinite(duration) && duration === 7 * 24 * 60 * 60
+  }
+
+  function addScopedWeeklyLines(lines, ctx, data) {
+    if (!data || !Array.isArray(data.limits)) return
+    for (let i = 0; i < data.limits.length; i++) {
+      const limit = data.limits[i]
+      if (!isWeeklyScopedLimit(limit)) continue
+      const label = scopedLimitLabel(limit)
+      if (!label) continue
+      addWeeklyPercentLine(lines, ctx, label, limit)
+    }
+  }
+
   function queryTokenUsage(ctx, homePath) {
     const since = new Date()
     // Inclusive range: today + previous 30 days = 31 calendar days.
@@ -785,25 +876,15 @@
         }))
       }
       if (data.seven_day_sonnet && typeof data.seven_day_sonnet.utilization === "number") {
-        lines.push(ctx.line.progress({
-          label: "Sonnet",
-          used: data.seven_day_sonnet.utilization,
-          limit: 100,
-          format: { kind: "percent" },
-          resetsAt: ctx.util.toIso(data.seven_day_sonnet.resets_at),
-          periodDurationMs: 7 * 24 * 60 * 60 * 1000 // 7 days
-        }))
+        addWeeklyPercentLine(lines, ctx, "Sonnet", data.seven_day_sonnet)
+      }
+      if (data.seven_day_fable && typeof data.seven_day_fable.utilization === "number") {
+        addWeeklyPercentLine(lines, ctx, "Fable", data.seven_day_fable)
       }
       if (data.seven_day_omelette && typeof data.seven_day_omelette.utilization === "number") {
-        lines.push(ctx.line.progress({
-          label: "Claude Design",
-          used: data.seven_day_omelette.utilization,
-          limit: 100,
-          format: { kind: "percent" },
-          resetsAt: ctx.util.toIso(data.seven_day_omelette.resets_at),
-          periodDurationMs: 7 * 24 * 60 * 60 * 1000 // 7 days
-        }))
+        addWeeklyPercentLine(lines, ctx, "Claude Design", data.seven_day_omelette)
       }
+      addScopedWeeklyLines(lines, ctx, data)
 
       if (data.extra_usage && data.extra_usage.is_enabled) {
         const used = data.extra_usage.used_credits

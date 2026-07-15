@@ -49,6 +49,20 @@ Returns rate limit windows and optional extra credits.
     "utilization": 0,
     "resets_at": "2026-02-01T00:00:00Z"
   },
+  "seven_day_fable": {              // separate weekly Fable limit (optional, plan-dependent)
+    "utilization": 50,
+    "resets_at": "2026-02-01T00:00:00Z"
+  },
+  "limits": [                       // model-scoped weekly limits (optional)
+    {
+      "kind": "weekly_scoped",
+      "percent": 50,
+      "resets_at": "2026-02-01T00:00:00Z",
+      "scope": {
+        "model": { "display_name": "Fable" }
+      }
+    }
+  ],
   "extra_usage": {                  // on-demand overage credits (optional)
     "is_enabled": true,
     "used_credits": 500,            // cents spent

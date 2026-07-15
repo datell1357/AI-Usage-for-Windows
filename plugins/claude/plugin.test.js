@@ -590,6 +590,88 @@ describe("claude plugin", () => {
     expect(result.lines.find((line) => line.label === "Extra usage spent")).toBeTruthy()
   })
 
+  it("renders Fable line from seven_day_fable", async () => {
+    const ctx = makeCtx()
+    ctx.host.fs.readText = () =>
+      JSON.stringify({ claudeAiOauth: { accessToken: "token", subscriptionType: "pro" } })
+    ctx.host.fs.exists = () => true
+    ctx.host.http.request.mockReturnValue({
+      status: 200,
+      bodyText: JSON.stringify({
+        seven_day_fable: { utilization: 50, resets_at: "2099-01-01T00:00:00.000Z" },
+      }),
+    })
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+    const line = result.lines.find((l) => l.label === "Fable")
+    expect(line).toBeTruthy()
+    expect(line.used).toBe(50)
+    expect(line.limit).toBe(100)
+    expect(line.format).toEqual({ kind: "percent" })
+    expect(line.resetsAt).toBe("2099-01-01T00:00:00.000Z")
+  })
+
+  it("renders weekly scoped model limits from limits array", async () => {
+    const ctx = makeCtx()
+    ctx.host.fs.readText = () =>
+      JSON.stringify({ claudeAiOauth: { accessToken: "token", subscriptionType: "pro" } })
+    ctx.host.fs.exists = () => true
+    ctx.host.http.request.mockReturnValue({
+      status: 200,
+      bodyText: JSON.stringify({
+        limits: [
+          {
+            kind: "weekly_scoped",
+            utilization: 37,
+            resets_at: "2099-01-01T00:00:00.000Z",
+            scope: { model: { display_name: "Sonnet" } },
+          },
+          {
+            kind: "weekly_scoped",
+            percent: 50,
+            reset_at: "2099-01-02T00:00:00.000Z",
+            scope: { model: "claude-fable-5" },
+          },
+        ],
+      }),
+    })
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+    const sonnet = result.lines.find((l) => l.label === "Sonnet")
+    const fable = result.lines.find((l) => l.label === "Fable")
+    expect(sonnet).toBeTruthy()
+    expect(sonnet.used).toBe(37)
+    expect(sonnet.periodDurationMs).toBe(7 * 24 * 60 * 60 * 1000)
+    expect(fable).toBeTruthy()
+    expect(fable.used).toBe(50)
+    expect(fable.resetsAt).toBe("2099-01-02T00:00:00.000Z")
+  })
+
+  it("does not duplicate scoped model limits already rendered from top-level fields", async () => {
+    const ctx = makeCtx()
+    ctx.host.fs.readText = () =>
+      JSON.stringify({ claudeAiOauth: { accessToken: "token", subscriptionType: "pro" } })
+    ctx.host.fs.exists = () => true
+    ctx.host.http.request.mockReturnValue({
+      status: 200,
+      bodyText: JSON.stringify({
+        seven_day_sonnet: { utilization: 5, resets_at: "2099-01-01T00:00:00.000Z" },
+        limits: [
+          {
+            kind: "weekly_scoped",
+            utilization: 25,
+            scope: { model: { display_name: "Sonnet" } },
+          },
+        ],
+      }),
+    })
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+    const sonnetLines = result.lines.filter((l) => l.label === "Sonnet")
+    expect(sonnetLines).toHaveLength(1)
+    expect(sonnetLines[0].used).toBe(5)
+  })
+
   it("renders Claude Design line from seven_day_omelette with normalized resetsAt", async () => {
     const ctx = makeCtx()
     ctx.host.fs.readText = () =>

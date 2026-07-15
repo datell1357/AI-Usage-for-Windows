@@ -99,10 +99,11 @@ describe("settings", () => {
       { id: "codex", name: "Codex", iconUrl: "", lines: [], primaryCandidates: [] },
       { id: "claude", name: "Claude", iconUrl: "", lines: [], primaryCandidates: [] },
       { id: "copilot", name: "Copilot", iconUrl: "", lines: [], primaryCandidates: [] },
+      { id: "sakana", name: "Sakana AI", iconUrl: "", lines: [], primaryCandidates: [] },
     ]
     const result = normalizePluginSettings({ order: [], disabled: [] }, plugins)
-    expect(result.order).toEqual(["claude", "codex", "gemini", "antigravity", "cursor", "copilot"])
-    expect(result.disabled).toEqual([])
+    expect(result.order).toEqual(["claude", "codex", "gemini", "antigravity", "cursor", "copilot", "sakana"])
+    expect(result.disabled).toEqual(["sakana"])
   })
 
   it("preserves stored disabled default providers", () => {
@@ -113,11 +114,12 @@ describe("settings", () => {
       { id: "antigravity", name: "Antigravity", iconUrl: "", lines: [], primaryCandidates: [] },
       { id: "cursor", name: "Cursor", iconUrl: "", lines: [], primaryCandidates: [] },
       { id: "copilot", name: "Copilot", iconUrl: "", lines: [], primaryCandidates: [] },
+      { id: "sakana", name: "Sakana AI", iconUrl: "", lines: [], primaryCandidates: [] },
     ]
 
     const result = normalizePluginSettings(
       {
-        order: ["claude", "codex", "gemini", "antigravity", "cursor", "copilot"],
+        order: ["claude", "codex", "gemini", "antigravity", "cursor", "copilot", "sakana"],
         disabled: ["gemini", "antigravity", "cursor", "copilot"],
       },
       plugins
@@ -134,6 +136,7 @@ describe("settings", () => {
       { id: "antigravity", name: "Antigravity", iconUrl: "", lines: [], primaryCandidates: [] },
       { id: "cursor", name: "Cursor", iconUrl: "", lines: [], primaryCandidates: [] },
       { id: "copilot", name: "Copilot", iconUrl: "", lines: [], primaryCandidates: [] },
+      { id: "sakana", name: "Sakana AI", iconUrl: "", lines: [], primaryCandidates: [] },
     ]
 
     const result = normalizePluginSettings(
@@ -141,8 +144,8 @@ describe("settings", () => {
       plugins
     )
 
-    expect(result.order).toEqual(["claude", "codex", "gemini", "antigravity", "cursor", "copilot"])
-    expect(result.disabled).toEqual(["gemini"])
+    expect(result.order).toEqual(["claude", "codex", "gemini", "antigravity", "cursor", "copilot", "sakana"])
+    expect(result.disabled).toEqual(["gemini", "sakana"])
   })
 
   it("compares settings equality", () => {

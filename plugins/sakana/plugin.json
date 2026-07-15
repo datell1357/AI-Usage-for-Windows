@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "sakana",
+  "name": "Sakana AI",
+  "version": "0.0.1",
+  "entry": "plugin.js",
+  "icon": "icon.svg",
+  "brandColor": "#E10600",
+  "links": [
+    { "label": "Console", "url": "https://console.sakana.ai/billing" },
+    { "label": "Fugu docs", "url": "https://console.sakana.ai/get-started" }
+  ],
+  "lines": [
+    { "type": "progress", "label": "5-hour", "scope": "overview", "primaryOrder": 1 },
+    { "type": "progress", "label": "Weekly", "scope": "overview" },
+    { "type": "text", "label": "Subscription", "scope": "detail" },
+    { "type": "text", "label": "Renewal", "scope": "detail" }
+  ]
+}

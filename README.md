@@ -37,6 +37,7 @@ The Windows release currently bundles these providers:
 | [Codex](docs/providers/codex.md) | Available | Codex/ChatGPT OAuth usage, weekly/session limits, reviews, credits |
 | [Gemini](docs/providers/gemini.md) | Available | Gemini CLI / Code Assist OAuth credentials and Cloud Code quota APIs |
 | [GitHub Copilot](docs/providers/copilot.md) | Available | GitHub CLI authenticated Copilot usage limits |
+| [Sakana AI](docs/providers/sakana.md) | Available | Sakana AI Fugu 5-hour, weekly, and subscription details |
 | [Antigravity](docs/providers/antigravity.md) | Available | Windows SQLite and Cloud Code fallback path |
 | [Cursor](docs/providers/cursor.md) | Available | Cursor Desktop SQLite and CLI credential fallback |
 
@@ -50,6 +51,7 @@ Gemini usage reflects Gemini CLI / Code Assist quota buckets. Gemini app compute
 - [Codex provider](docs/providers/codex.md)
 - [Gemini provider](docs/providers/gemini.md)
 - [GitHub Copilot provider](docs/providers/copilot.md)
+- [Sakana AI provider](docs/providers/sakana.md)
 - [Antigravity provider](docs/providers/antigravity.md)
 - [Cursor provider](docs/providers/cursor.md)
 - [Plugin API](docs/plugins/api.md)
@@ -153,6 +155,7 @@ AI Usage는 Windows 시스템 트레이에서만 동작하며 작업표시줄에
 | [Codex](docs/providers/codex.md) | 사용 가능 | Codex/ChatGPT OAuth 사용량, 주간/세션 제한, reviews, credits |
 | [Gemini](docs/providers/gemini.md) | 사용 가능 | Gemini CLI / Code Assist OAuth credentials 및 Cloud Code quota API |
 | [GitHub Copilot](docs/providers/copilot.md) | 사용 가능 | GitHub CLI 인증 기반 Copilot 사용량 제한 |
+| [Sakana AI](docs/providers/sakana.md) | 사용 가능 | Sakana AI Fugu의 5시간, 주간 및 구독 정보 |
 | [Antigravity](docs/providers/antigravity.md) | 사용 가능 | Windows SQLite 및 Cloud Code fallback 경로 |
 | [Cursor](docs/providers/cursor.md) | 사용 가능 | Cursor Desktop SQLite 및 CLI credential fallback |
 
@@ -166,6 +169,7 @@ Gemini 사용량은 Gemini CLI / Code Assist quota bucket 기준입니다. Gemin
 - [Codex provider](docs/providers/codex.md)
 - [Gemini provider](docs/providers/gemini.md)
 - [GitHub Copilot provider](docs/providers/copilot.md)
+- [Sakana AI provider](docs/providers/sakana.md)
 - [Antigravity provider](docs/providers/antigravity.md)
 - [Cursor provider](docs/providers/cursor.md)
 - [Plugin API](docs/plugins/api.md)

@@ -76,7 +76,7 @@ export const RESET_TIMER_DISPLAY_OPTIONS: { value: ResetTimerDisplayMode; label:
 
 const store = new LazyStore(SETTINGS_STORE_PATH);
 
-export const DEFAULT_PLUGIN_ORDER = ["claude", "codex", "gemini", "antigravity", "cursor", "copilot"] as const;
+export const DEFAULT_PLUGIN_ORDER = ["claude", "codex", "gemini", "antigravity", "cursor", "copilot", "sakana"] as const;
 
 const DEFAULT_ENABLED_PLUGINS = new Set(["claude", "codex", "gemini", "antigravity", "cursor", "copilot"]);
 

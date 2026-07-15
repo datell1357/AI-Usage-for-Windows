@@ -16,7 +16,7 @@ use std::sync::{Mutex, OnceLock};
 #[cfg(target_os = "windows")]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-const WHITELISTED_ENV_VARS: [&str; 20] = [
+const WHITELISTED_ENV_VARS: [&str; 21] = [
     "CODEX_HOME",
     "CLAUDE_CONFIG_DIR",
     "CLAUDE_CODE_OAUTH_TOKEN",
@@ -37,6 +37,7 @@ const WHITELISTED_ENV_VARS: [&str; 20] = [
     "COPILOT_GITHUB_TOKEN",
     "GH_TOKEN",
     "GITHUB_TOKEN",
+    "GROK_COOKIE",
 ];
 
 fn last_non_empty_trimmed_line(text: &str) -> Option<String> {
@@ -474,7 +475,9 @@ fn redact_body(body: &str) -> String {
         "apiKey",
         "authorization",
         "bearer",
+        "cookie",
         "credential",
+        "grokCookie",
         "session_token",
         "sessionToken",
         "auth_token",
@@ -483,6 +486,7 @@ fn redact_body(body: &str) -> String {
         "idToken",
         "accessToken",
         "refreshToken",
+        "id",
         "user_id",
         "userId",
         "account_id",
@@ -491,6 +495,10 @@ fn redact_body(body: &str) -> String {
         "teamId",
         "payment_id",
         "paymentId",
+        "subscription_id",
+        "subscriptionId",
+        "customer_id",
+        "customerId",
         "profile_arn",
         "profileArn",
         "email",
@@ -905,7 +913,15 @@ fn inject_http<'js>(ctx: &Ctx<'js>, host: &Object<'js>, plugin_id: &str) -> rqui
                 })?;
                 let mut builder = client.request(method, &req.url);
                 builder = builder.headers(header_map);
-                if let Some(body) = req.body_text {
+                if let Some(body_b64) = req.body_base64 {
+                    let body = BASE64_STANDARD.decode(body_b64).map_err(|e| {
+                        Exception::throw_message(
+                            &ctx_inner,
+                            &format!("invalid request bodyBase64: {}", e),
+                        )
+                    })?;
+                    builder = builder.body(body);
+                } else if let Some(body) = req.body_text {
                     builder = builder.body(body);
                 }
 
@@ -924,22 +940,36 @@ fn inject_http<'js>(ctx: &Ctx<'js>, host: &Object<'js>, plugin_id: &str) -> rqui
                     })?;
                     resp_headers.insert(key.to_string(), header_value.to_string());
                 }
-                let body = response
-                    .text()
-                    .map_err(|e| Exception::throw_message(&ctx_inner, &e.to_string()))?;
+                let body_bytes = response
+                    .bytes()
+                    .map_err(|e| Exception::throw_message(&ctx_inner, &e.to_string()))?
+                    .to_vec();
+                let body = String::from_utf8_lossy(&body_bytes).to_string();
+                let body_base64 = BASE64_STANDARD.encode(&body_bytes);
 
                 // Redact BEFORE truncation to ensure sensitive values are caught while intact
-                let redacted_body = redact_body(&body);
-                let body_preview = if redacted_body.len() > 500 {
-                    // UTF-8 safe truncation: find valid char boundary at or before 500
-                    let truncated: String = redacted_body
-                        .char_indices()
-                        .take_while(|(i, _)| *i < 500)
-                        .map(|(_, c)| c)
-                        .collect();
-                    format!("{}... ({} bytes total)", truncated, body.len())
+                let content_type = resp_headers
+                    .get("content-type")
+                    .map(|s| s.to_ascii_lowercase())
+                    .unwrap_or_default();
+                let body_preview = if content_type.contains("grpc")
+                    || content_type.contains("protobuf")
+                    || content_type.contains("octet-stream")
+                {
+                    format!("[binary body: {} bytes]", body_bytes.len())
                 } else {
-                    redacted_body
+                    let redacted_body = redact_body(&body);
+                    if redacted_body.len() > 500 {
+                        // UTF-8 safe truncation: find valid char boundary at or before 500
+                        let truncated: String = redacted_body
+                            .char_indices()
+                            .take_while(|(i, _)| *i < 500)
+                            .map(|(_, c)| c)
+                            .collect();
+                        format!("{}... ({} bytes total)", truncated, body.len())
+                    } else {
+                        redacted_body
+                    }
                 };
                 log::info!(
                     "[plugin:{}] HTTP {} {} -> {} | {}",
@@ -954,6 +984,7 @@ fn inject_http<'js>(ctx: &Ctx<'js>, host: &Object<'js>, plugin_id: &str) -> rqui
                     status,
                     headers: resp_headers,
                     body_text: body,
+                    body_base64,
                 };
 
                 serde_json::to_string(&resp)
@@ -990,6 +1021,7 @@ pub fn patch_http_wrapper(ctx: &rquickjs::Ctx<'_>) -> rquickjs::Result<()> {
                     method: req.method || "GET",
                     headers: req.headers || null,
                     bodyText: req.bodyText || null,
+                    bodyBase64: req.bodyBase64 || null,
                     timeoutMs: req.timeoutMs || 10000,
                     dangerouslyIgnoreTls: req.dangerouslyIgnoreTls || false
                 });
@@ -1292,6 +1324,7 @@ struct HttpReqParams {
     method: Option<String>,
     headers: Option<std::collections::HashMap<String, String>>,
     body_text: Option<String>,
+    body_base64: Option<String>,
     timeout_ms: Option<u64>,
     dangerously_ignore_tls: Option<bool>,
 }
@@ -1302,6 +1335,7 @@ struct HttpRespParams {
     status: u16,
     headers: std::collections::HashMap<String, String>,
     body_text: String,
+    body_base64: String,
 }
 
 // --- Language Server Discovery ---
@@ -2838,6 +2872,7 @@ mod tests {
                 "{name} must be whitelisted for Claude auth compatibility"
             );
         }
+        assert!(WHITELISTED_ENV_VARS.contains(&"GROK_COOKIE"));
 
         let rt = Runtime::new().expect("runtime");
         let ctx = Context::full(&rt).expect("context");
@@ -3207,6 +3242,25 @@ mod tests {
             "expected path marker, got: {}",
             redacted
         );
+    }
+
+    #[test]
+    fn redact_body_redacts_subscription_and_customer_ids() {
+        let body = r#"{"id":"sub_generic123456789","subscriptionId":"sub_1234567890abcdef","customerId":"cus_abcdef1234567890","subscription_id":"sub_zyxwvutsrqponmlk","customer_id":"cus_0123456789abcdef"}"#;
+        let redacted = redact_body(body);
+        for secret in [
+            "sub_generic123456789",
+            "sub_1234567890abcdef",
+            "cus_abcdef1234567890",
+            "sub_zyxwvutsrqponmlk",
+            "cus_0123456789abcdef",
+        ] {
+            assert!(
+                !redacted.contains(secret),
+                "subscription and customer ids must be redacted, got: {}",
+                redacted
+            );
+        }
     }
 
     #[test]
